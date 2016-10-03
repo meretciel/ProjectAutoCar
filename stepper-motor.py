@@ -5,67 +5,121 @@ import time
 gpio.setmode(gpio.BOARD)
 
 
-in_1 = 3
-in_2 = 5
-in_3 = 7
-in_4 = 11
 
+class StepperMotor:
+    """
+    StepperMotor is a class the represents a stepper motor. It provides functions to control the motor and keeps record of
+    the motor status.
 
-# set all motor input to 0
-gpio.setup(in_1, gpio.OUT, initial=0)
-gpio.setup(in_2, gpio.OUT, initial=0)
-gpio.setup(in_3, gpio.OUT, initial=0)
-gpio.setup(in_4, gpio.OUT, initial=0)
+    Attributes:
+        pins:      Pins used to send signal to stepper motor. pins is a list of length 4 because the a common stepper motor has 4 inputs.
+        init_pos:  Double. It represents the position of the motore. It is set by the user and is quite arbitrary.
+        delta_pos: Double. The cumulative change of the position.
+    """
 
+    def __init__(self, pins, init_pos=0):
+        assert isinstance(pins, list) and len(pins) == 4, 'Invalid pins.'
 
-time.sleep(1.5)
+        self._pins = list(pins)
+        for pin in self._pins:
+            gpio.setup(pin, gpio.OUT, initial=0)
 
-tt = 0.002
+        time.sleep(1.0)
 
+        self._init_pos = init_pos 
+        self._delta_pos = 0.
 
-def rotate(pins, degree=None, clockwise=False, delay=0.002):
-    if clockwise:
-        in_1, in_2, in_3, in_4 = pins[::-1]
-    else:
-        in_1, in_2, in_3, in_4 = pins
+    def rotate(self, degree=None, clockwise=False, delay=0.002):
+        """
+        Calling the rorate function will make the motor rotate. The degree controls the range of the movement. If the degree is None, the
+        motor will not stop. The dealy controls the speed of the motor. 
+        """
+        if clockwise:
+            in_1, in_2, in_3, in_4 = self._pins[::-1]
+        else:
+            in_1, in_2, in_3, in_4 = self._pins
 
-    if degree is None:
-        remaining = 1
-    else:
-        remaining = degree
-    
-    print(in_1,in_2,in_3,in_4)
+        if degree is None:
+            remaining = 1
+        else:
+            remaining = degree
 
-    stepsize = 360. / 4096.  * 8
-    while degree is None or remaining > 0:
-        print('remaining: {}'.format(remaining))
-        gpio.output(in_1, 1); time.sleep(delay); 
-        gpio.output(in_4, 0); time.sleep(delay); 
-        gpio.output(in_2, 1); time.sleep(delay); 
-        gpio.output(in_1, 0); time.sleep(delay); 
-        gpio.output(in_3, 1); time.sleep(delay); 
-        gpio.output(in_2, 0); time.sleep(delay); 
-        gpio.output(in_4, 1); time.sleep(delay); 
-        gpio.output(in_3, 0); time.sleep(delay); 
-        remaining -= stepsize
+        #TODO: remove the hard-coded number
+        stepsize = 360. / 4096.  * 8
 
-def swing(pins, degree=180, delay=0.002):
-    while True:
-        rotate(pins, degree=degree, clockwise=True,delay=delay)
-        for pin in pins:
+        while degree is None or remaining > 0:
+            gpio.output(in_1, 1); time.sleep(delay); 
+            gpio.output(in_4, 0); time.sleep(delay); 
+            gpio.output(in_2, 1); time.sleep(delay); 
+            gpio.output(in_1, 0); time.sleep(delay); 
+            gpio.output(in_3, 1); time.sleep(delay); 
+            gpio.output(in_2, 0); time.sleep(delay); 
+            gpio.output(in_4, 1); time.sleep(delay); 
+            gpio.output(in_3, 0); time.sleep(delay); 
+
+            if degree is not None:
+                remaining -= stepsize
+
+            if clockwise:
+                self._delta_pos -= stepsize
+            else:
+                self._delta_pos += stepsize
+            
+    def turn_off_all_pins(self):
+        for pin in self._pins:
             gpio.output(pin,0)
-        time.sleep(3 * delay)
-        rotate(pins, degree=degree, clockwise=False,delay=delay)
-        for pin in pins:
-            gpio.output(pin,0)
-        time.sleep(3 * delay)
+
+    def scan(self, degree=180, pre_rot=90, delay=0.002):
+        """
+        swing function will make the motor to continuously scan a certain area.
+        Note that if the motor starts to scan it will not stop unless you stop the python process.
+
+        Args:
+            degree: The max degree the will be covered by the scan. 360 represetn a full scan cricle.
+            pre_rot: This can be used to indicate how far the motor is to its zero position. If pre_rot=90, then the motor will
+                     spin 90 degree anti-clockwisely and then scan normally.
+            delay: This parameter controls the speed of the scan.
+
+        """
+
+        # pre-rotate and the motor will be back to the zero position
+        self.rotate(degree=pre_rot, clockwise=False, delay=delay)
+
+        while True:
+            self.rotate(degree=degree, clockwise=True,delay=delay)
+            self.turn_off_all_pins()
+            time.sleep(3 * delay)
+
+            self.rotate(degree=degree, clockwise=False,delay=delay)
+            self.turn_off_all_pins()
+            time.sleep(3 * delay)
+
+
+    @property
+    def delta_pos(self):
+        return self._delta_pos
+
+    @property
+    def pos(sefl):
+        return self._init_pos + self.delta_pos
+
 
 if __name__ == '__main__':
-    print("starat")
-    time.sleep(2)
+
+    in_1 = 3
+    in_2 = 5
+    in_3 = 7
+    in_4 = 11
+
     pins = [in_1, in_2, in_3, in_4 ]
-    #rotate([in_1, in_2, in_3, in_4], degree=360)
-    swing(pins, degree=180)
+    stepperMotor = StepperMotor(pins)
+
+    time.sleep(2.)
+    print('call stepperMotor.rotate()')
+    input('press any key to start')
+#    stepperMotor.rotate()
+    stepperMotor.scan(pre_rot=90)
+    #swing(pins, degree=180)
     
 
 
