@@ -3,6 +3,10 @@ from abc import ABCMeta, abstractmethod
 import multiprocessing as mp
 
 
+from stepper_motor import StepperMotor
+from distance_sensor import DistanceSensor
+
+
 class Component(metaclass=ABCMeta):
     #TODO: add lock to component to make it safer
     @abstractmethod
@@ -21,7 +25,7 @@ class Component(metaclass=ABCMeta):
         """
         pass
 
-    def parse(self, msg_tuple):
+    def parse_and_execute(self, msg_tuple):
         """
         This function will parse the arguments and call the member function accordingly.
         The msg_tuple should be (func_name, args, kwargs):
@@ -35,42 +39,126 @@ class Component(metaclass=ABCMeta):
         func = getattr(self, func_name)
         func(*args, **kwargs)
 
+    def update(self, attr, val):
+        setattr(self, attr, val)
+
+    def d_update(self, attr, val):
+        orig_val = getattr(self,attr)
+        setattr(self, attr, orig_val + val)
 
 
+class DistanceRadarBaseComponent(Component):
+    CLOCKWISE = 0
+    ANTI_CLOCKWISE = 1
+    def __init__(self, name=None, pins=None, initial_pos=0, degree=180, pre_rot=90,delay=0.002, step_size=5):
+        assert name is not None
 
-class MyComponent(Component):
-    def __init__(self, x):
-        self._x = x
+        self._stepper_motor = StepperMotor(pins,initial_pos)
+        self._name = name
+        self._degree = degree
+        self._pre_rot = pre_rot
+        self._delay = delay
+        self._step_size = step_size
+        
+        self._zero_pos = None
+        self._direction = self.ANTI_CLOCKWISE
 
-    def send_msg(self, Q):
-        Q.put(str(self._x) + str(time.time()))
+        super(DistanceRadarBaseComponent, self).__init__()
+        
+    def initialize(self):
+        if self._pre_rot < 0:
+            self._stepper_motor.rotate(degree=-self._pre_rot, clockwise=False, delay=self._delay)
+        elif self._pre_rot > 0:
+            self._stepper_motor.rotate(degree=self._pre_rot, clockwise=True, delay=self._delay)
+
+        # the current position is used as internal zero degree position
+        # and this value shoulbe not be changed later
+        self._zero_pos = self._stepper_motor.pos
+
+
 
     def run(self):
-        print("MyComponent::{}".format(self._x))
-        time.sleep(0.5)
 
-    def parse(self, msg_tuple):
-        func_name, args, kwargs = msg_tuple
-        func = getattr(self, func_name)
-        func(*args, **kwargs)
+        if self._direction == self.ANTI_CLOCKWISE:
+            self._stepper_motor.rotate(degree=self._step_size, clockwise=False, delay=self._delay)
+            if self._stepper_motor.pos - self._zero_pos >= self._degree:
+                self._direction = self.CLOCKWISE
 
-    def increase_speed(self,delta):
-        self._x += delta
-
-
+        else:
+            self._stepper_motor.rotate(degree=self._step_size, clockwise=True, delay=self._delay)
+            if self._stepper_motor.pos - self._zero_pos <= 0:
+                self._direction = self.ANTI_CLOCKWISE
 
 
-class ComponentWrapper(mp.Process):
-    def __init__(self, component=None, event=None, cmd_Q=None,output=None):
+    def send_msg(self,Q):
+        msg = (time.time(), 'DistanceRadarBase::{}'.format(self._name), self._stepper_motor.pos, self.degree)
+        Q.put(msg)
+
+    
+    @property
+    def delay(self):
+        return self._delay
+    @delay.setter
+    def delay(self,val):
+        self._delay = val
+
+
+    @property
+    def degree(self):
+        return self._degree
+    @degree.setter
+    def degree(self,val):
+        self._degree = val
+        
+    @property
+    def step_size(self):
+        return self._step_size
+    @step_size.setter
+    def step_size(self, val):
+        self._step_size = val
+
+
+
+
+class DistanceRadarSensorComponent(Component):
+    def __init__(self, name=None, pin_echo=None, pin_trig=None, unit='m'):
+        assert name is not None
+
+        self._name = name
+        self._sensor = DistanceSensor(pin_echo=pin_echo, pin_trig=pin_trig, unit=unit)
+
+        super(DistanceRadarSensorComponent,self).__init__()
+
+    def run(self):
+        self._sensor.measure(depay=self._delay)
+
+    def send_msg(self,Q):
+        msg = (time.time(), 'DistanceRadarSensor-{}'.format(self._name), self._sensor.distance)
+
+
+
+
+class ContinuousComponentWrapper(mp.Process):
+    """
+    The ContinuousComponentWrapper is use to make a component running in the background.
+    
+
+    Args of __init__:
+        component: an instance of component class.
+        cmd_Q:     command queue. It is used to send command to the component when it is running in the background.
+        output_Q:  output queue. The wrapper sends out message or informaiton through this queue.
+
+
+    """
+    def __init__(self, component=None, cmd_Q=None,output_Q=None):
+        assert isinstance(component, Component)
+        assert isinstance(cmd_Q, mp.queues.Queue)
+        assert isinstance(output_Q, mp.queues.Queue)
+
         self._component = component
-        self._output = output_Q
+        self._output_Q = output_Q
         self._cmd_Q = cmd_Q
-        self._event = event
-
-        # set event to be true so the wrapepr can
-        # run from the beginning.
-        self._event.set()
-        super(ComponentWrapper,self).__init__()
+        super(ContinuousComponentWrapper,self).__init__()
 
     def loop(self, *args, **kwargs):
         """
@@ -80,10 +168,10 @@ class ComponentWrapper(mp.Process):
         #self._event.wait()
         while not self._cmd_Q.empty():
             cmd = self._cmd_Q.get()
-            self._component.parse(cmd)
+            self._component.parse_and_execute(cmd)
 
         self._component.run()
-        self._component.send_msg(self._output)
+        self._component.send_msg(self._output_Q)
         self.loop()
 
     def run(self):
@@ -99,27 +187,30 @@ class ComponentWrapper(mp.Process):
 
 
 if __name__ == '__main__':
-    myComponent = MyComponent(10)
-    myEvent = mp.Event()
-    output_Q = mp.Queue()
+    in_1 = 3
+    in_2 = 5
+    in_3 = 7
+    in_4 = 11
+
+    pins = [in_1, in_2, in_3, in_4 ]
+
+    radar_base = DistanceRadarBaseComponent(
+            name='radar_base', pins=pins, initial_pos=0, degree=180, pre_rot=0,delay=0.002
+    )
+    radar_base.initialize()
     cmd_Q = mp.Queue()
+    output_Q = mp.Queue()
 
-    wrapper = ComponentWrapper(component=myComponent, cmd_Q=cmd_Q, event=myEvent,output=output_Q)
-    wrapper.start()
+    cComponent = ContinuousComponentWrapper(component=radar_base, cmd_Q=cmd_Q,output_Q=output_Q)
+    cComponent.start()
 
 
-    for t in range(10):
-        myEvent.clear()
-        cmd_Q.put(('increase_speed', (t,), {}))
+    for i in range(10):
+        print('i:'.format(i))
         while not output_Q.empty():
             print(output_Q.get())
-        myEvent.set()
-        time.sleep(1.5)
-
-
-
-
-    wrapper.join()
+        time.sleep(3)
+        cmd_Q.put(('update', ('degree', 180 - 5 * i), {}))
 
 
 
