@@ -5,6 +5,7 @@ import multiprocessing as mp
 
 from stepper_motor import StepperMotor
 from distance_sensor import DistanceSensor
+from controller import RawDataHandler
 
 
 class Component(metaclass=ABCMeta):
@@ -46,10 +47,19 @@ class Component(metaclass=ABCMeta):
         orig_val = getattr(self,attr)
         setattr(self, attr, orig_val + val)
 
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def parser(self):
+        return self._parser
 
 class DistanceRadarBaseComponent(Component):
     CLOCKWISE = 0
     ANTI_CLOCKWISE = 1
+    PARSER = [(x,i) for i, x in enumerate(['timestamp','comp_name','pos','degree'])]
+
     def __init__(self, name=None, pins=None, initial_pos=0, degree=180, pre_rot=90,delay=0.002, step_size=5):
         assert name is not None
 
@@ -62,6 +72,8 @@ class DistanceRadarBaseComponent(Component):
         
         self._zero_pos = None
         self._direction = self.ANTI_CLOCKWISE
+
+        self._parser = DistanceRadarBaseComponent.PARSER
 
         super(DistanceRadarBaseComponent, self).__init__()
         
@@ -121,6 +133,7 @@ class DistanceRadarBaseComponent(Component):
 
 
 class DistanceRadarSensorComponent(Component):
+    PARSER = [(x,i) for i,x in enumerate(['timestamp','comp_name','distance', 'status'])]
     def __init__(self, name=None, pin_echo=None, pin_trig=None, unit='m', delay=0.00001):
         assert name is not None
 
@@ -129,6 +142,8 @@ class DistanceRadarSensorComponent(Component):
         self._measure_result = (None,DistanceSensor.INIT)
         self._delay = delay
 
+        self._parser =  DistanceRadarSensorComponent.PARSER
+
         super(DistanceRadarSensorComponent,self).__init__()
 
     def run(self):
@@ -136,7 +151,8 @@ class DistanceRadarSensorComponent(Component):
         time.sleep(self._delay)
 
     def send_msg(self,Q):
-        msg = (time.time(), 'DistanceRadarSensor::{}'.format(self._name), self._measure_result)
+        res = self._measure_result
+        msg = (time.time(), 'DistanceRadarSensor::{}'.format(self._name), res[0], res[1])
         Q.put(msg)
 
 
@@ -197,13 +213,15 @@ if __name__ == '__main__':
 
     pins = [in_1, in_2, in_3, in_4 ]
 
-    radar_base = DistanceRadarBaseComponent(name='radar_base', pins=pins, initial_pos=0, degree=180, pre_rot=0,delay=0.002)
+    radar_base = DistanceRadarBaseComponent(name='radar_base', pins=pins, step_size=0.31, initial_pos=0, degree=80, pre_rot=40,delay=0.0018)
     radar_base.initialize()
+    radar_base_param = RawDataHandler(name=radar_base.name, parser=radar_base.parser, record_size=1500)
 
     cmd_Q_base    = mp.Queue()
     output_Q_base = mp.Queue()
 
     cont_radar_base = ContinuousComponentWrapper(component=radar_base, cmd_Q=cmd_Q_base, output_Q=output_Q_base)
+
 
     # set up the distance sensor
     pin_echo = 18
@@ -212,24 +230,38 @@ if __name__ == '__main__':
     cmd_Q_sensor = mp.Queue()
     output_Q_sensor = mp.Queue()
 
-    distance_sensor = DistanceRadarSensorComponent(name='radar_distance_sensor', pin_echo=pin_echo, pin_trig=pin_trig)
+    distance_sensor = DistanceRadarSensorComponent(name='radar_distance_sensor', pin_echo=pin_echo, pin_trig=pin_trig, delay=0.00007)
+    distance_sensor_param = RawDataHandler(name=distance_sensor.name, parser=distance_sensor.parser, record_size=1000)
+
     cont_distance_sensor = ContinuousComponentWrapper(component=distance_sensor, cmd_Q=cmd_Q_sensor, output_Q=output_Q_sensor)
+
+    print("start the processin 3s")
+    time.sleep(3)
 
     cont_radar_base.start()
     cont_distance_sensor.start()
 
+    _start =time.time()
     while True:
         while not output_Q_sensor.empty():
-            print(output_Q_sensor.get())
+            msg = output_Q_sensor.get()
+            print(msg)
+            distance_sensor_param.update(msg)
 
         while not output_Q_base.empty():
-            print(output_Q_base.get())
+            msg = output_Q_base.get()
+            print(msg)
+            radar_base_param.update(msg)
 
-
+        if time.time() - _start > 15:
+            break
+    
+    distance_sensor_param.data.to_csv('sensor_data.csv')
+    radar_base_param.data.to_csv('radar_base.csv')
 
     # start the parallel process
-    cont_radar_base.join()
-    cont_distance_sensor.join()
+#    cont_radar_base.join()
+#    cont_distance_sensor.join()
 
 
 

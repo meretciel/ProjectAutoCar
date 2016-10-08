@@ -39,7 +39,7 @@ class DistanceSensor:
         _start = start
 
         while gpio.input(self._pin_echo) == 0: # no echo signal received
-            if time.time() - _start > 1.:
+            if time.time() - _start > 0.03:
                 self._status = DistanceSensor.TIMEOUT 
                 break
             start = time.time()
