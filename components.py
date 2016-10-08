@@ -121,19 +121,23 @@ class DistanceRadarBaseComponent(Component):
 
 
 class DistanceRadarSensorComponent(Component):
-    def __init__(self, name=None, pin_echo=None, pin_trig=None, unit='m'):
+    def __init__(self, name=None, pin_echo=None, pin_trig=None, unit='m', delay=0.00001):
         assert name is not None
 
         self._name = name
         self._sensor = DistanceSensor(pin_echo=pin_echo, pin_trig=pin_trig, unit=unit)
+        self._measure_result = (None,DistanceSensor.INIT)
+        self._delay = delay
 
         super(DistanceRadarSensorComponent,self).__init__()
 
     def run(self):
-        self._sensor.measure(depay=self._delay)
+        self._measure_result = self._sensor.measure()
+        time.sleep(self._delay)
 
     def send_msg(self,Q):
-        msg = (time.time(), 'DistanceRadarSensor-{}'.format(self._name), self._sensor.distance)
+        msg = (time.time(), 'DistanceRadarSensor::{}'.format(self._name), self._measure_result)
+        Q.put(msg)
 
 
 
@@ -160,22 +164,19 @@ class ContinuousComponentWrapper(mp.Process):
         self._cmd_Q = cmd_Q
         super(ContinuousComponentWrapper,self).__init__()
 
-    def loop(self, *args, **kwargs):
-        """
-        This function will allow the wrapper to run continuously by recusive call. At the begin of the loop, the internal
-        event will wait. This is useful when other processes want to change the attributes of the component
-        """
-        #self._event.wait()
-        while not self._cmd_Q.empty():
-            cmd = self._cmd_Q.get()
-            self._component.parse_and_execute(cmd)
-
-        self._component.run()
-        self._component.send_msg(self._output_Q)
-        self.loop()
-
     def run(self):
-        self.loop()
+        """
+        Running the component in the infinite loop. To change the status of the component, one can send command to the command queue.
+        #TODO: add a stop-pill
+        """
+        while True:
+            while not self._cmd_Q.empty():
+                cmd = self._cmd_Q.get()
+                self._component.parse_and_execute(cmd)
+
+            self._component.run()
+            self._component.send_msg(self._output_Q)
+
 
 
     @property
@@ -187,6 +188,8 @@ class ContinuousComponentWrapper(mp.Process):
 
 
 if __name__ == '__main__':
+
+    # set up the radar base
     in_1 = 3
     in_2 = 5
     in_3 = 7
@@ -194,23 +197,43 @@ if __name__ == '__main__':
 
     pins = [in_1, in_2, in_3, in_4 ]
 
-    radar_base = DistanceRadarBaseComponent(
-            name='radar_base', pins=pins, initial_pos=0, degree=180, pre_rot=0,delay=0.002
-    )
+    radar_base = DistanceRadarBaseComponent(name='radar_base', pins=pins, initial_pos=0, degree=180, pre_rot=0,delay=0.002)
     radar_base.initialize()
-    cmd_Q = mp.Queue()
-    output_Q = mp.Queue()
 
-    cComponent = ContinuousComponentWrapper(component=radar_base, cmd_Q=cmd_Q,output_Q=output_Q)
-    cComponent.start()
+    cmd_Q_base    = mp.Queue()
+    output_Q_base = mp.Queue()
+
+    cont_radar_base = ContinuousComponentWrapper(component=radar_base, cmd_Q=cmd_Q_base, output_Q=output_Q_base)
+
+    # set up the distance sensor
+    pin_echo = 18
+    pin_trig = 16
+
+    cmd_Q_sensor = mp.Queue()
+    output_Q_sensor = mp.Queue()
+
+    distance_sensor = DistanceRadarSensorComponent(name='radar_distance_sensor', pin_echo=pin_echo, pin_trig=pin_trig)
+    cont_distance_sensor = ContinuousComponentWrapper(component=distance_sensor, cmd_Q=cmd_Q_sensor, output_Q=output_Q_sensor)
+
+    cont_radar_base.start()
+    cont_distance_sensor.start()
+
+    while True:
+        while not output_Q_sensor.empty():
+            print(output_Q_sensor.get())
+
+        while not output_Q_base.empty():
+            print(output_Q_base.get())
 
 
-    for i in range(10):
-        print('i:'.format(i))
-        while not output_Q.empty():
-            print(output_Q.get())
-        time.sleep(3)
-        cmd_Q.put(('update', ('degree', 180 - 5 * i), {}))
+
+    # start the parallel process
+    cont_radar_base.join()
+    cont_distance_sensor.join()
+
+
+
+
 
 
 

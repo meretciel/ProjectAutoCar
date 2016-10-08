@@ -26,11 +26,10 @@ class DistanceSensor:
         self._status = DistanceSensor.INIT
         self._latest_measure = (None, DistanceSensor.INIT)
 
-    def measure_once(self):
+    def measure(self):
         """
-        measure the distance once. The returnd value is (distance, status)
+        measure the distance once. The returnd value is a tuple: (distance, status)
         """
-
         # send out the signal
         gpio.output(self._pin_trig, 1)
         time.sleep(self._pulse)
@@ -64,18 +63,6 @@ class DistanceSensor:
 
         return distance_m, self._status
 
-    def measure(self, delay=0.1):
-        """
-        Measure the distance several times. The Measure function will return a coroutine.
-        """
-        try:
-            while True:
-                msg = (yield)
-                self._latest_measure = self.measure_once()
-                time.sleep(delay)
-        except GeneratorExit:
-            print('disconnect to the distance sensor')
-            pass
 
 
                     
@@ -85,23 +72,4 @@ if __name__ == '__main__':
     trig = 16
 
     distance_sensor = DistanceSensor(pin_echo=echo, pin_trig=trig)
-
-    input('press any key to start')
-
-    #print(distance_sensor.measure_once())
-    observer = distance_sensor.measure(repeat=30)
-    next(observer)
-    
-    res = []
-
-    for msg in ['m','m','m','stop']:
-        observer.send(msg)
-        res.append(distance_sensor._latest_measure)
-
-    observer.close()
-
-    for item in res:
-        print(item)
-                
-
 
