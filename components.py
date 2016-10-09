@@ -6,7 +6,7 @@ import multiprocessing as mp
 from stepper_motor import StepperMotor
 from distance_sensor import DistanceSensor
 from controller import RawDataHandler
-from wheel_motor.py import WheelMotor
+from wheel_motor import WheelMotor
 
 
 class Component(metaclass=ABCMeta):
@@ -211,7 +211,7 @@ class WheelComponent(Component):
     Represent a single wheel.
     """
 
-    def __init__(self, name=None, mirror=False, pin_siganl=None, repeat=10, pulse=None, width=0.020):
+    def __init__(self, name=None, mirror=False, pin_signal=None, repeat=10, pulse=None, width=None):
         """
         Args:
             name:           the name of the component.
@@ -225,7 +225,7 @@ class WheelComponent(Component):
                             class, which make the motor still. The default value of pulse is None.
             repeat:         the number pulse sent to the motor in a cycle.
             width:          In the communication protocol, the signal consists of two parts: (1)pulse and (2)silence. The width specifies the length 
-                            of the slient period.
+                            of the slient period. If the width is None, it will be set to the width value of the underlaying motor class.
 
         """
 
@@ -233,14 +233,14 @@ class WheelComponent(Component):
         assert pin_signal is not None
         self._name = name
         self._pin_signal = pin_signal
-        self._motor = WheelMotor(pin_signal = self._pin_signal)
+        self._motor = WheelMotor(pin_signal=self._pin_signal)
         self._reference_pulse = self._motor.reference_pulse
         self._max_deviation = self._motor.max_pulse_deviation
         self._max_pulse = self._reference_pulse + self._max_deviation
         self._min_pulse = self._reference_pulse - self._max_deviation
 
         self._pulse = pulse if pulse is not None else self._reference_pulse
-        self._width = width
+        self._width = width if width is not None else self._motor.width
         self._repeat = repeat
         self._mirror = mirror
 
@@ -296,63 +296,91 @@ class WheelComponent(Component):
 
 if __name__ == '__main__':
 
-    # set up the radar base
-    in_1 = 3
-    in_2 = 5
-    in_3 = 7
-    in_4 = 11
+#    # set up the radar base
+#    in_1 = 3
+#    in_2 = 5
+#    in_3 = 7
+#    in_4 = 11
+#
+#    pins = [in_1, in_2, in_3, in_4 ]
+#
+#    radar_base = DistanceRadarBaseComponent(name='radar_base', pins=pins, step_size=0.71, initial_pos=0, degree=80, pre_rot=40,delay=0.0025)
+#    radar_base.initialize()
+#    radar_base_param = RawDataHandler(name=radar_base.name, parser=radar_base.parser, record_size=2000)
+#
+#    cmd_Q_base    = mp.Queue()
+#    output_Q_base = mp.Queue()
+#
+#    cont_radar_base = ContinuousComponentWrapper(component=radar_base, cmd_Q=cmd_Q_base, output_Q=output_Q_base)
+#
+#
+#    # set up the distance sensor
+#    pin_echo = 18
+#    pin_trig = 16
+#
+#    cmd_Q_sensor = mp.Queue()
+#    output_Q_sensor = mp.Queue()
+#
+#    distance_sensor = DistanceRadarSensorComponent(name='radar_distance_sensor', pin_echo=pin_echo, pin_trig=pin_trig, delay=0.00007)
+#    distance_sensor_param = RawDataHandler(name=distance_sensor.name, parser=distance_sensor.parser, record_size=2000)
+#
+#    cont_distance_sensor = ContinuousComponentWrapper(component=distance_sensor, cmd_Q=cmd_Q_sensor, output_Q=output_Q_sensor)
+#
+#    print("start the processin 3s")
+#    time.sleep(3)
+#
+#    cont_radar_base.start()
+#    cont_distance_sensor.start()
+#
+#    _start =time.time()
+#    while True:
+#        while not output_Q_sensor.empty():
+#            msg = output_Q_sensor.get()
+#            print(msg)
+#            distance_sensor_param.update(msg)
+#
+#        while not output_Q_base.empty():
+#            msg = output_Q_base.get()
+#            print(msg)
+#            radar_base_param.update(msg)
+#
+#        if time.time() - _start > 90:
+#            break
+#    
+#    distance_sensor_param.data.to_csv('sensor_data.csv')
+#    radar_base_param.data.to_csv('radar_base.csv')
+#
+#    
 
-    pins = [in_1, in_2, in_3, in_4 ]
+    pin_signal_left = 13
+    pin_signal_right = 15
 
-    radar_base = DistanceRadarBaseComponent(name='radar_base', pins=pins, step_size=0.71, initial_pos=0, degree=80, pre_rot=40,delay=0.0025)
-    radar_base.initialize()
-    radar_base_param = RawDataHandler(name=radar_base.name, parser=radar_base.parser, record_size=2000)
+    left_wheel_component  = WheelComponent(name='left_wheel', mirror=False, pin_signal=pin_signal_left, repeat=10, pulse=None, width=None)
+    right_wheel_component = WheelComponent(name='right_wheel', mirror=True, pin_signal=pin_signal_right, repeat=10, pulse=None, width=None)
 
-    cmd_Q_base    = mp.Queue()
-    output_Q_base = mp.Queue()
+    cmd_Q_left_wheel = mp.Queue()
+    output_Q_left_wheel = mp.Queue()
+    cmd_Q_right_wheel = mp.Queue()
+    output_Q_right_wheel = mp.Queue()
 
-    cont_radar_base = ContinuousComponentWrapper(component=radar_base, cmd_Q=cmd_Q_base, output_Q=output_Q_base)
+
+    left_wheel = ContinuousComponentWrapper(component=left_wheel_component,cmd_Q=cmd_Q_left_wheel,output_Q=output_Q_left_wheel)
+    right_wheel = ContinuousComponentWrapper(component=right_wheel_component,cmd_Q=cmd_Q_right_wheel,output_Q=output_Q_right_wheel)
 
 
-    # set up the distance sensor
-    pin_echo = 18
-    pin_trig = 16
+    left_wheel.start()
+    right_wheel.start()
 
-    cmd_Q_sensor = mp.Queue()
-    output_Q_sensor = mp.Queue()
-
-    distance_sensor = DistanceRadarSensorComponent(name='radar_distance_sensor', pin_echo=pin_echo, pin_trig=pin_trig, delay=0.00007)
-    distance_sensor_param = RawDataHandler(name=distance_sensor.name, parser=distance_sensor.parser, record_size=2000)
-
-    cont_distance_sensor = ContinuousComponentWrapper(component=distance_sensor, cmd_Q=cmd_Q_sensor, output_Q=output_Q_sensor)
-
-    print("start the processin 3s")
-    time.sleep(3)
-
-    cont_radar_base.start()
-    cont_distance_sensor.start()
-
-    _start =time.time()
     while True:
-        while not output_Q_sensor.empty():
-            msg = output_Q_sensor.get()
-            print(msg)
-            distance_sensor_param.update(msg)
+        print('loop')
+        time.sleep(3)
+        cmd_Q_left_wheel.put(('increase_speed',(0.1,), {}))
+        cmd_Q_right_wheel.put(('increase_speed', (0.1,), {}))
 
-        while not output_Q_base.empty():
-            msg = output_Q_base.get()
-            print(msg)
-            radar_base_param.update(msg)
 
-        if time.time() - _start > 90:
-            break
+
     
-    distance_sensor_param.data.to_csv('sensor_data.csv')
-    radar_base_param.data.to_csv('radar_base.csv')
 
-    # start the parallel process
-#    cont_radar_base.join()
-#    cont_distance_sensor.join()
 
 
 
