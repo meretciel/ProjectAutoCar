@@ -6,6 +6,7 @@ import multiprocessing as mp
 from stepper_motor import StepperMotor
 from distance_sensor import DistanceSensor
 from controller import RawDataHandler
+from wheel_motor.py import WheelMotor
 
 
 class Component(metaclass=ABCMeta):
@@ -54,6 +55,54 @@ class Component(metaclass=ABCMeta):
     @property
     def parser(self):
         return self._parser
+
+
+
+class ContinuousComponentWrapper(mp.Process):
+    """
+    The ContinuousComponentWrapper is use to make a component running in the background.
+    
+
+    Args of __init__:
+        component: an instance of component class.
+        cmd_Q:     command queue. It is used to send command to the component when it is running in the background.
+        output_Q:  output queue. The wrapper sends out message or informaiton through this queue.
+
+
+    """
+    def __init__(self, component=None, cmd_Q=None,output_Q=None):
+        assert isinstance(component, Component)
+        assert isinstance(cmd_Q, mp.queues.Queue)
+        assert isinstance(output_Q, mp.queues.Queue)
+
+        self._component = component
+        self._output_Q = output_Q
+        self._cmd_Q = cmd_Q
+        super(ContinuousComponentWrapper,self).__init__()
+
+    def run(self):
+        """
+        Running the component in the infinite loop. To change the status of the component, one can send command to the command queue.
+        #TODO: add a stop-pill
+        """
+        while True:
+            while not self._cmd_Q.empty():
+                cmd = self._cmd_Q.get()
+                self._component.parse_and_execute(cmd)
+
+            self._component.run()
+            self._component.send_msg(self._output_Q)
+
+
+
+    @property
+    def component(self):
+        return self._component
+
+
+
+
+
 
 class DistanceRadarBaseComponent(Component):
     CLOCKWISE = 0
@@ -157,47 +206,89 @@ class DistanceRadarSensorComponent(Component):
 
 
 
-
-class ContinuousComponentWrapper(mp.Process):
+class WheelComponent(Component):
     """
-    The ContinuousComponentWrapper is use to make a component running in the background.
-    
-
-    Args of __init__:
-        component: an instance of component class.
-        cmd_Q:     command queue. It is used to send command to the component when it is running in the background.
-        output_Q:  output queue. The wrapper sends out message or informaiton through this queue.
-
-
+    Represent a single wheel.
     """
-    def __init__(self, component=None, cmd_Q=None,output_Q=None):
-        assert isinstance(component, Component)
-        assert isinstance(cmd_Q, mp.queues.Queue)
-        assert isinstance(output_Q, mp.queues.Queue)
 
-        self._component = component
-        self._output_Q = output_Q
-        self._cmd_Q = cmd_Q
-        super(ContinuousComponentWrapper,self).__init__()
+    def __init__(self, name=None, mirror=False, pin_siganl=None, repeat=10, pulse=None, width=0.020):
+        """
+        Args:
+            name:           the name of the component.
+            mirror:         Bool. The left wheel and right wheel is a mirro image of each other. Therefore, with the same configuration and the 
+                            same operaton the effect is opposite. For example, let assume we are in a scenario where when we increase the pulse, 
+                            the motor spins faster clockwisely. If this motor is used for right wheel, when the pulse is increased, the robot will
+                            be speed up; while if it is used for right wheel, the robot will be slowed down. This is a mirror effect. The mirror 
+                            parameter is used to handle the mirror effet so we can have a unified interface to control both the left and right wheel.
+            pin_signal:     the pin number for sending the pulse to the motor.
+            pulse:          the pulse that is send to the motor. If the pulse is None,it will be set to the reference pulse of the underlying motor 
+                            class, which make the motor still. The default value of pulse is None.
+            repeat:         the number pulse sent to the motor in a cycle.
+            width:          In the communication protocol, the signal consists of two parts: (1)pulse and (2)silence. The width specifies the length 
+                            of the slient period.
+
+        """
+
+        assert name is not None
+        assert pin_signal is not None
+        self._name = name
+        self._pin_signal = pin_signal
+        self._motor = WheelMotor(pin_signal = self._pin_signal)
+        self._reference_pulse = self._motor.reference_pulse
+        self._max_deviation = self._motor.max_pulse_deviation
+        self._max_pulse = self._reference_pulse + self._max_deviation
+        self._min_pulse = self._reference_pulse - self._max_deviation
+
+        self._pulse = pulse if pulse is not None else self._reference_pulse
+        self._width = width
+        self._repeat = repeat
+        self._mirror = mirror
+
 
     def run(self):
-        """
-        Running the component in the infinite loop. To change the status of the component, one can send command to the command queue.
-        #TODO: add a stop-pill
-        """
-        while True:
-            while not self._cmd_Q.empty():
-                cmd = self._cmd_Q.get()
-                self._component.parse_and_execute(cmd)
+        self._motor.generate_pulse(repeat=self._repeat,pulse=self._pulse, width=0.020)
 
-            self._component.run()
-            self._component.send_msg(self._output_Q)
+    def send_msg(self,Q):
+        pass
 
+    @property
+    def pulse(self):
+        return self._pulse
+    @pulse.setter
+    def pulse(self, val):
+        self._pulse = min(val, self._width)
 
 
     @property
-    def component(self):
-        return self._component
+    def repeat(self):
+        return self._repeat
+    @repeat.setter
+    def repeat(self,val):
+        self._repeat = min(val, 50)
+
+    def increase_speed(self, scale):
+        scale = min(scale, 1.)
+        scale = max(scale, -1.)
+
+        increment = scale *  self._max_deviation
+
+        if self._mirror:
+            increment = -1 * increment
+
+        new_pulse = self.pulse + increment
+        new_pulse = min(self._max_pulse, new_pulse)
+        new_pulse = max(self._min_pulse, new_pulse)
+
+        self._pulse = new_pulse
+
+
+
+
+
+
+        
+
+
 
 
 
@@ -213,9 +304,9 @@ if __name__ == '__main__':
 
     pins = [in_1, in_2, in_3, in_4 ]
 
-    radar_base = DistanceRadarBaseComponent(name='radar_base', pins=pins, step_size=0.31, initial_pos=0, degree=80, pre_rot=40,delay=0.0018)
+    radar_base = DistanceRadarBaseComponent(name='radar_base', pins=pins, step_size=0.71, initial_pos=0, degree=80, pre_rot=40,delay=0.0025)
     radar_base.initialize()
-    radar_base_param = RawDataHandler(name=radar_base.name, parser=radar_base.parser, record_size=1500)
+    radar_base_param = RawDataHandler(name=radar_base.name, parser=radar_base.parser, record_size=2000)
 
     cmd_Q_base    = mp.Queue()
     output_Q_base = mp.Queue()
@@ -231,7 +322,7 @@ if __name__ == '__main__':
     output_Q_sensor = mp.Queue()
 
     distance_sensor = DistanceRadarSensorComponent(name='radar_distance_sensor', pin_echo=pin_echo, pin_trig=pin_trig, delay=0.00007)
-    distance_sensor_param = RawDataHandler(name=distance_sensor.name, parser=distance_sensor.parser, record_size=1000)
+    distance_sensor_param = RawDataHandler(name=distance_sensor.name, parser=distance_sensor.parser, record_size=2000)
 
     cont_distance_sensor = ContinuousComponentWrapper(component=distance_sensor, cmd_Q=cmd_Q_sensor, output_Q=output_Q_sensor)
 
@@ -253,7 +344,7 @@ if __name__ == '__main__':
             print(msg)
             radar_base_param.update(msg)
 
-        if time.time() - _start > 15:
+        if time.time() - _start > 90:
             break
     
     distance_sensor_param.data.to_csv('sensor_data.csv')
