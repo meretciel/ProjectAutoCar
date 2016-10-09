@@ -281,6 +281,9 @@ class WheelComponent(Component):
 
         self._pulse = new_pulse
 
+    def stop(self):
+        self._pulse = self._reference_pulse
+
 
 
 
@@ -355,8 +358,8 @@ if __name__ == '__main__':
     pin_signal_left = 13
     pin_signal_right = 15
 
-    left_wheel_component  = WheelComponent(name='left_wheel', mirror=False, pin_signal=pin_signal_left, repeat=10, pulse=None, width=None)
-    right_wheel_component = WheelComponent(name='right_wheel', mirror=True, pin_signal=pin_signal_right, repeat=10, pulse=None, width=None)
+    left_wheel_component  = WheelComponent(name='left_wheel', mirror=False, pin_signal=pin_signal_left, repeat=20, pulse=None, width=None)
+    right_wheel_component = WheelComponent(name='right_wheel', mirror=True, pin_signal=pin_signal_right, repeat=20, pulse=None, width=None)
 
     cmd_Q_left_wheel = mp.Queue()
     output_Q_left_wheel = mp.Queue()
@@ -371,11 +374,13 @@ if __name__ == '__main__':
     left_wheel.start()
     right_wheel.start()
 
+    scale = 0.
     while True:
-        print('loop')
+        print('scale: {}'.format(scale))
         time.sleep(3)
         cmd_Q_left_wheel.put(('increase_speed',(0.1,), {}))
         cmd_Q_right_wheel.put(('increase_speed', (0.1,), {}))
+        scale += 0.1
 
 
 
