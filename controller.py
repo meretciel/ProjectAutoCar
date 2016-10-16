@@ -60,17 +60,14 @@ class RawDataHandler:
         self._records     = []
         self._record_size = record_size
         self._parser = parser
-        self._columns = [x[0] for x in self._parser]
+        self._columns = parser
 
     def update(self, msg):
         if len(self._records) == self._record_size:
             self._records.pop(0)
 
         # parse the msg
-        record = []
-        for attr, idx in self._parser:
-            record.append(msg[idx])
-        self._records.append(record)
+        self._records.append(list(msg))
     
 
     @property

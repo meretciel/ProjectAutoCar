@@ -52,9 +52,6 @@ class Component(metaclass=ABCMeta):
     def name(self):
         return self._name
 
-    @property
-    def parser(self):
-        return self._parser
 
 
 
@@ -107,8 +104,7 @@ class ContinuousComponentWrapper(mp.Process):
 class DistanceRadarBaseComponent(Component):
     CLOCKWISE = 0
     ANTI_CLOCKWISE = 1
-    PARSER = [(x,i) for i, x in enumerate(['timestamp','comp_name','pos','degree'])]
-
+    FORMAT = ('timestamp', 'comp_name', 'pos', 'degree')
     def __init__(self, name=None, pins=None, initial_pos=0, degree=180, pre_rot=90,delay=0.002, step_size=5):
         assert name is not None
 
@@ -122,7 +118,6 @@ class DistanceRadarBaseComponent(Component):
         self._zero_pos = None
         self._direction = self.ANTI_CLOCKWISE
 
-        self._parser = DistanceRadarBaseComponent.PARSER
 
         super(DistanceRadarBaseComponent, self).__init__()
         
@@ -182,7 +177,7 @@ class DistanceRadarBaseComponent(Component):
 
 
 class DistanceRadarSensorComponent(Component):
-    PARSER = [(x,i) for i,x in enumerate(['timestamp','comp_name','distance', 'status'])]
+    FORMAT = ('timestamp','comp_name','distance','status')
     def __init__(self, name=None, pin_echo=None, pin_trig=None, unit='m', delay=0.00001):
         assert name is not None
 
@@ -191,7 +186,6 @@ class DistanceRadarSensorComponent(Component):
         self._measure_result = (None,DistanceSensor.INIT)
         self._delay = delay
 
-        self._parser =  DistanceRadarSensorComponent.PARSER
 
         super(DistanceRadarSensorComponent,self).__init__()
 
@@ -210,6 +204,7 @@ class WheelComponent(Component):
     """
     Represent a single wheel.
     """
+    FORMAT = ('timestamp', 'comp_name', 'pulse', 'repeat')
 
     def __init__(self, name=None, mirror=False, pin_signal=None, repeat=10, pulse=None, width=None):
         """
@@ -249,7 +244,7 @@ class WheelComponent(Component):
         self._motor.generate_pulse(repeat=self._repeat,pulse=self._pulse, width=0.020)
 
     def send_msg(self,Q):
-        pass
+        Q.put((time.time(), 'WheelComponent::{}'.format(self._name), self.pulse, self.repeat)
 
     @property
     def pulse(self):
@@ -258,6 +253,9 @@ class WheelComponent(Component):
     def pulse(self, val):
         self._pulse = min(val, self._width)
 
+    @property
+    def reference_pulse(self):
+        return self._reference_pulse
 
     @property
     def repeat(self):
@@ -266,18 +264,37 @@ class WheelComponent(Component):
     def repeat(self,val):
         self._repeat = min(val, 50)
 
-    def increase_speed(self, scale):
-        scale = min(scale, 1.)
-        scale = max(scale, -1.)
+    def increase_speed(self, scale, block=True):
+        """
+        increase the speed of the wheel motor. 
+        
+        Args:
+            scale: float. The valid/effective range of scale is -2 to 2 depending on the status of the wheel motor. If the value is outside this range,
+                          There will be no warning. In order to increase the speed of the motor, we will chagne the value of pulse. Each motor has a 
+                          reference pulse which makes the motor still and a max deviation of the pulse. When we increase the speed by scale, the effect
+                          is increase the current pulse by max_deviation_of_pulse * scale. If the new pulse will be adjusted to be inside the max
+                          deviation.
+            block: bool. Default is True. When block is set True, the increase_speed function cannot change the direction of the rotation. 
+
+        """
+#        scale = min(scale, 1.)
+#        scale = max(scale, -1.)
 
         increment = scale *  self._max_deviation
 
         if self._mirror:
             increment = -1 * increment
 
-        new_pulse = self.pulse + increment
-        new_pulse = min(self._max_pulse, new_pulse)
-        new_pulse = max(self._min_pulse, new_pulse)
+        curr_pulse = self.pulse
+        new_pulse = curr_pulse + increment
+            
+        if curr_pulse >= self._reference_pulse:
+            new_pulse = min(self._max_pulse, new_pulse)
+            new_pulse = max(self._reference_pulse, new_pulse)
+        else:
+            new_pulse = min(self._reference_pulse, new_pulse)
+            new_pulse = max(self._min_pulse, new_pulse)
+
 
         self._pulse = new_pulse
 

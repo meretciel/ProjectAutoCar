@@ -8,7 +8,7 @@ gpio.setmode(gpio.BOARD)
 
 class WheelMotor:
     reference_pulse     = 0.00145
-    max_pulse_deviation = 0.00035
+    max_pulse_deviation = 0.00025
     width               = 0.020
     def __init__(self, pin_signal=None):
         assert pin_signal is not None
