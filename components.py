@@ -77,6 +77,11 @@ class ContinuousComponentWrapper(mp.Process):
         self._cmd_Q = cmd_Q
         super(ContinuousComponentWrapper,self).__init__()
 
+
+    def __getattr__(self, attr):
+        return getattr(self.component, attr)
+
+
     def run(self):
         """
         Running the component in the infinite loop. To change the status of the component, one can send command to the command queue.
@@ -96,6 +101,14 @@ class ContinuousComponentWrapper(mp.Process):
     def component(self):
         return self._component
 
+
+    @property
+    def cmd_Q(self):
+        return self._cmd_Q
+
+    @property
+    def output_Q(self):
+        return self._output_Q
 
 
 
