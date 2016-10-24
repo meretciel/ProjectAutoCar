@@ -257,7 +257,7 @@ class WheelComponent(Component):
         self._motor.generate_pulse(repeat=self._repeat,pulse=self._pulse, width=0.020)
 
     def send_msg(self,Q):
-        Q.put((time.time(), 'WheelComponent::{}'.format(self._name), self.pulse, self.repeat)
+        Q.put((time.time(), 'WheelComponent::{}'.format(self._name), self.pulse, self.repeat))
 
     @property
     def pulse(self):
@@ -277,7 +277,7 @@ class WheelComponent(Component):
     def repeat(self,val):
         self._repeat = min(val, 50)
 
-    def increase_speed(self, scale, block=True):
+    def increase_speed(self, scale, block=False):
         """
         increase the speed of the wheel motor. 
         
@@ -300,12 +300,18 @@ class WheelComponent(Component):
 
         curr_pulse = self.pulse
         new_pulse = curr_pulse + increment
-            
-        if curr_pulse >= self._reference_pulse:
-            new_pulse = min(self._max_pulse, new_pulse)
-            new_pulse = max(self._reference_pulse, new_pulse)
+
+        if block:
+                
+            if curr_pulse >= self._reference_pulse:
+                new_pulse = min(self._max_pulse, new_pulse)
+                new_pulse = max(self._reference_pulse, new_pulse)
+            else:
+                new_pulse = min(self._reference_pulse, new_pulse)
+                new_pulse = max(self._min_pulse, new_pulse)
+
         else:
-            new_pulse = min(self._reference_pulse, new_pulse)
+            new_pulse = min(self._max_pulse, new_pulse)
             new_pulse = max(self._min_pulse, new_pulse)
 
 
@@ -328,7 +334,7 @@ class WheelComponent(Component):
 
 
 if __name__ == '__main__':
-
+#
 #    # set up the radar base
 #    in_1 = 3
 #    in_2 = 5
@@ -339,7 +345,7 @@ if __name__ == '__main__':
 #
 #    radar_base = DistanceRadarBaseComponent(name='radar_base', pins=pins, step_size=0.71, initial_pos=0, degree=80, pre_rot=40,delay=0.0025)
 #    radar_base.initialize()
-#    radar_base_param = RawDataHandler(name=radar_base.name, parser=radar_base.parser, record_size=2000)
+#    radar_base_param = RawDataHandler(name=radar_base.name, parser=radar_base.FORMAT, record_size=2000)
 #
 #    cmd_Q_base    = mp.Queue()
 #    output_Q_base = mp.Queue()
@@ -355,7 +361,7 @@ if __name__ == '__main__':
 #    output_Q_sensor = mp.Queue()
 #
 #    distance_sensor = DistanceRadarSensorComponent(name='radar_distance_sensor', pin_echo=pin_echo, pin_trig=pin_trig, delay=0.00007)
-#    distance_sensor_param = RawDataHandler(name=distance_sensor.name, parser=distance_sensor.parser, record_size=2000)
+#    distance_sensor_param = RawDataHandler(name=distance_sensor.name, parser=distance_sensor.FORMAT, record_size=2000)
 #
 #    cont_distance_sensor = ContinuousComponentWrapper(component=distance_sensor, cmd_Q=cmd_Q_sensor, output_Q=output_Q_sensor)
 #
@@ -411,8 +417,8 @@ if __name__ == '__main__':
         cmd_Q_left_wheel.put(('increase_speed',(0.1,), {}))
         cmd_Q_right_wheel.put(('increase_speed', (0.1,), {}))
         scale += 0.1
-
-
+#
+#
 
     
 

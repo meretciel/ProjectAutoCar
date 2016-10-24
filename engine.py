@@ -34,6 +34,9 @@ class Engine:
         self._left_wheel_comp = left_wheel_comp
         self._right_wheel_comp = right_wheel_comp
 
+        self._startup_scale = startup_scale
+        self._stacle_scale = stable_scale
+
 #        self._reference_pulse_left = left_wheel_comp.reference_pulse
 #        self._reference_pulse_right = right_wheel_comp.reference_pulse
 #        self._pulse_left = left_wheel_comp.pulse
@@ -44,7 +47,7 @@ class Engine:
         self._output_Q_left = mp.Queue()
         self._output_Q_right = mp.Queue()
 
-        self._left_wheel = ContinuousComponentWrapper(component=self._left_wheel_comp, cmd_Q=self._cmd_Q_left,output_Q=self._output_Q_left)
+        self._left_wheel  = ContinuousComponentWrapper(component=self._left_wheel_comp,  cmd_Q=self._cmd_Q_left, output_Q=self._output_Q_left)
         self._right_wheel = ContinuousComponentWrapper(component=self._right_wheel_comp, cmd_Q=self._cmd_Q_right,output_Q=self._output_Q_right)
 
 
@@ -52,8 +55,11 @@ class Engine:
         """
         change the speed of the two wheels. A utility function.
         """
-        self._cmd_Q_left.put(('increase_speed',(left_scale,), {}))
+        self._cmd_Q_left.put(('increase_speed',  (left_scale,), {}))
         self._cmd_Q_right.put(('increase_speed', (right_scale,), {}))
+
+    def increase_speed(self, scale):
+        self._change_speed(left_scale=scale, right_scale=scale)
 
 
     def stop(self):

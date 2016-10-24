@@ -13,7 +13,7 @@ from controller import RawDataHandler
 
 
 if __name__ == '__main__':
-
+    
     
     # set up the radar base
     in_1 = 3
@@ -46,11 +46,11 @@ if __name__ == '__main__':
     cont_distance_sensor = ContinuousComponentWrapper(component=distance_sensor, cmd_Q=cmd_Q_sensor, output_Q=output_Q_sensor)
     
     
-    pin_signal_left = 13
-    pin_signal_right = 15
+    pin_signal_left = 15
+    pin_signal_right = 13
 
-    left_wheel_component  = WheelComponent(name='left_wheel', mirror=False, pin_signal=pin_signal_left, repeat=20, pulse=None, width=None)
-    right_wheel_component = WheelComponent(name='right_wheel', mirror=True, pin_signal=pin_signal_right, repeat=20, pulse=None, width=None)
+    left_wheel_component  = WheelComponent(name='left_wheel',  mirror=False, pin_signal=pin_signal_left,  repeat=30, pulse=None, width=None)
+    right_wheel_component = WheelComponent(name='right_wheel', mirror=True,  pin_signal=pin_signal_right, repeat=30, pulse=None, width=None)
 
     engine = Engine(left_wheel_comp=left_wheel_component, right_wheel_comp=right_wheel_component)
 
@@ -66,15 +66,20 @@ if __name__ == '__main__':
 
 
     while True:
-       while not output_Q_base.empty():
-           msg = output_Q_base.get()
-           radar_base_datahandler.update(msg)
-           print(msg)
+        while not output_Q_base.empty():
+            msg = output_Q_base.get()
+            radar_base_datahandler.update(msg)
+#            print(msg)
 
-       while not output_Q_sensor.empty():
-           msg = output_Q_sensor.get()
-           distance_sensor_datahandler.update(msg)
-           print(msg)
-
+        while not output_Q_sensor.empty():
+            msg = output_Q_sensor.get()
+            distance_sensor_datahandler.update(msg)
+#            print(msg)
+            
+#        engine.stop() 
+        time.sleep(5)
+        print('engine increases speed')
+        engine.increase_speed(0.2)
+        
 
 
