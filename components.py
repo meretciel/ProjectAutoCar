@@ -8,9 +8,11 @@ from distance_sensor import DistanceSensor
 from controller import RawDataHandler
 from wheel_motor import WheelMotor
 
+CMD_EXIT = '__exit__'
 
 class Component(metaclass=ABCMeta):
-    #TODO: add lock to component to make it safer
+
+
     @abstractmethod
     def send_msg(self,Q):
         """
@@ -37,9 +39,32 @@ class Component(metaclass=ABCMeta):
 
         """
 
-        func_name, args, kwargs = msg_tuple
+        #TODO: add exit status
+
+        len_tuple = len(msg_tuple)
+
+        if len_tuple == 1:
+            func_name = msg_tuple[0]
+            args = ()
+            kwargs = {}
+        elif len_tuple == 2:
+            func_name = msg_tuple[0]
+            comp = msg_tuple[1]
+            args = ()
+            kwargs = {}
+            if isinstance(comp, tuple):
+                args = comp
+            elif isinstance(comp, dict):
+                kwargs = comp
+
+
+
+        else: # all components are present
+            func_name, args, kwargs = msg_tuple
+
         func = getattr(self, func_name)
         func(*args, **kwargs)
+
 
     def update(self, attr, val):
         setattr(self, attr, val)
@@ -87,13 +112,23 @@ class ContinuousComponentWrapper(mp.Process):
         Running the component in the infinite loop. To change the status of the component, one can send command to the command queue.
         #TODO: add a stop-pill
         """
-        while True:
-            while not self._cmd_Q.empty():
-                cmd = self._cmd_Q.get()
-                self._component.parse_and_execute(cmd)
+        try:
 
-            self._component.run()
-            self._component.send_msg(self._output_Q)
+            while True:
+                while not self._cmd_Q.empty():
+                    cmd = self._cmd_Q.get()
+                    if cmd == CMD_EXIT or cmd == (CMD_EXIT,):
+                        return 
+                    self._component.parse_and_execute(cmd)
+
+
+                self._component.run()
+                self._component.send_msg(self._output_Q)
+
+        except KeyboardInterrupt:
+            if hasattr(self._component, 'KeyboardInterruptHandler'):
+                self._component.KeyboardInterruptHandler()
+            print('{} property exit after KeyboardInterrupt.'.format(self._component.name))
 
 
 
@@ -379,19 +414,25 @@ if __name__ == '__main__':
     cont_distance_sensor.start()
 
     _start =time.time()
-    while True:
-#        while not output_Q_sensor.empty():
-#            msg = output_Q_sensor.get()
-#            print(msg)
-#            distance_sensor_param.update(msg)
+    try:
+        while True:
+    #        while not output_Q_sensor.empty():
+    #            msg = output_Q_sensor.get()
+    #            print(msg)
+    #            distance_sensor_param.update(msg)
 
-        while not output_Q_base.empty():
-            msg = output_Q_base.get()
-            print(msg)
-            radar_base_param.update(msg)
+            while not output_Q_base.empty():
+                msg = output_Q_base.get()
+                print(msg)
+                radar_base_param.update(msg)
 
-        if time.time() - _start > 90:
-            break
+            if time.time() - _start > 90:
+                break
+    except KeyboardInterrupt:
+        cmd_Q_base.put(CMD_EXIT)
+        print("properly exit")
+        
+        pass
     
 #    distance_sensor_param.data.to_csv('sensor_data.csv')
 #    radar_base_param.data.to_csv('radar_base.csv')
