@@ -70,32 +70,47 @@ class StepperMotor:
         for pin in self._pins:
             gpio.output(pin,0)
 
-    def scan(self, degree=180, pre_rot=90, delay=0.002):
+    def scan(self, min_degree=0, max_degree=180, init_pos=0, delay=0.002, delay_factor=3):
         """
         Upon calling the scan function, the motor will make a round-trip. We can also specify a pre-scan movenent to
         adjust the initial position of the motor.
 
         Args:
-            degree:  The max degree the will be covered by the scan. 360 represetn a full scan cricle.
-            pre_rot: The specifies the movenent of the motor before it enters the loop. The positive degree 
-                     means the motor will spin anti-clockwisely; the negative degree meansthe motor will spin clockwisely.
-            delay:   This parameter controls the speed of the scan.
-
+            min_degree:       The minimum degree(position) of the range.
+            max_degree:       The maximum degree(position) of the range.
+            ini_pos:          The initial position of the motor. Once the initial position is specified, we can infer the position 
+                              that represents the zero degree.
+            delay:            This parameter controls the speed of the scan.
+            delay_factor:     Int (default value is 3). There is a pause in the movement when the motor arrives at the limit of the range.
+                              The lenght of the pause is delay_factor * delay.
         """
+        
 
-        # pre-rotate and the motor will be back to the zero position
-        if pre_rot < 0:
-            self.rotate(degree=-pre_rot, clockwise=True, delay=delay)
-        elif pre_rot > 0:
-            self.rotate(degree=pre_rot, clockwise=False, delay=delay)
+        # check if init_pos is inside the range. If not, adjust the init_pos to the center of the range
 
-        self.rotate(degree=degree, clockwise=False,delay=delay)
+        if init_pos < min_degree or init_pos > max_degree:
+            new_init_pos = (min_degree + max_degree) / 2
+            if new_init_pos > init_pos:
+                self.rotate(degree=new_init_pos - init_pos, clockwise=False, delay=delay)
+            else:
+                self.rotate(degree=init_pos - new_init_pos, clockwise=True, delay=delay)
+
+            init_pos = new_init_pos
+
+        # from init_pos to max_degree
+        self.rorate(degree=max_degree - init_pos, clockwise=False, delay=delay)
         self.turn_off_all_pins()
-        time.sleep(3 * delay)
+        time.sleep(delay_factor * delay)
 
-        self.rotate(degree=degree, clockwise=True,delay=delay)
+        # from max_degree to min_degree
+        self.rotate(degree=max_degree - min_degree, clockwise=True, delay=delay)
         self.turn_off_all_pins()
-        time.sleep(3 * delay)
+        time.sleep(delay_factor * delay)
+
+        # from min_degree to init_pos
+        self.rotate(degree=init_pos - min_degree, clockwise=False, delay=delay)
+        self.turn_off_all_pins()
+        time.sleep(delay_factor * delay)
 
 
     @property

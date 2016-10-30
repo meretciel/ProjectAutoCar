@@ -117,32 +117,31 @@ class ContinuousComponentWrapper(mp.Process):
 class DistanceRadarBaseComponent(Component):
     CLOCKWISE = 0
     ANTI_CLOCKWISE = 1
-    FORMAT = ('timestamp', 'comp_name', 'pos', 'degree')
-    def __init__(self, name=None, pins=None, initial_pos=0, degree=180, pre_rot=90,delay=0.002, step_size=5):
+    FORMAT = ('timestamp', 'comp_name', 'pos', 'min_degree', 'max_degree')
+    def __init__(self, name=None, pins=None, initial_pos=0, min_degree=0, max_degree=180, delay=0.002, step_size=5):
         assert name is not None
 
         self._stepper_motor = StepperMotor(pins,initial_pos)
         self._name = name
-        self._degree = degree
-        self._pre_rot = pre_rot
+        self._init_pos = initial_pos
+        self._min_degree = min_degree
+        self._max_degree = max_degree
         self._delay = delay
         self._step_size = step_size
         
-        self._zero_pos = None
         self._direction = self.ANTI_CLOCKWISE
 
 
         super(DistanceRadarBaseComponent, self).__init__()
         
     def initialize(self):
-        if self._pre_rot < 0:
-            self._stepper_motor.rotate(degree=-self._pre_rot, clockwise=False, delay=self._delay)
-        elif self._pre_rot > 0:
-            self._stepper_motor.rotate(degree=self._pre_rot, clockwise=True, delay=self._delay)
 
-        # the current position is used as internal zero degree position
-        # and this value shoulbe not be changed later
-        self._zero_pos = self._stepper_motor.pos
+        if self._init_pos < self._min_degree or self._init_pos > self._max_degree:
+            new_init_pos = (self._min_degree + self._max_degree) / 2
+            if new_init_pos > self._init_pos:
+                self._stepper_motor.rotate(degree=new_init_pos - self._init_pos, clockwise=False, delay=self._delay)
+            else:
+                self._stepper_motor.rotate(degree=self._init_pos - new_init_pos, clockwise=True, delay=self._delay)
 
 
 
@@ -150,17 +149,17 @@ class DistanceRadarBaseComponent(Component):
 
         if self._direction == self.ANTI_CLOCKWISE:
             self._stepper_motor.rotate(degree=self._step_size, clockwise=False, delay=self._delay)
-            if self._stepper_motor.pos - self._zero_pos >= self._degree:
+            if self._stepper_motor.pos > self._max_degree :
                 self._direction = self.CLOCKWISE
 
         else:
             self._stepper_motor.rotate(degree=self._step_size, clockwise=True, delay=self._delay)
-            if self._stepper_motor.pos - self._zero_pos <= 0:
+            if self._stepper_motor.pos < self._min_degree:
                 self._direction = self.ANTI_CLOCKWISE
 
 
     def send_msg(self,Q):
-        msg = (time.time(), 'DistanceRadarBase::{}'.format(self._name), self._stepper_motor.pos, self.degree)
+        msg = (time.time(), 'DistanceRadarBase::{}'.format(self._name), self._stepper_motor.pos, self.min_degree, self.max_degree)
         Q.put(msg)
 
     
@@ -172,12 +171,20 @@ class DistanceRadarBaseComponent(Component):
         self._delay = val
 
 
+#    @property
+#    def degree(self):
+#        return self._degree
+#    @degree.setter
+#    def degree(self,val):
+#        self._degree = val
+    
     @property
-    def degree(self):
-        return self._degree
-    @degree.setter
-    def degree(self,val):
-        self._degree = val
+    def max_degree(self):
+        return self._max_degree
+
+    @property
+    def min_degree(self):
+        return self._min_degree
         
     @property
     def step_size(self):
@@ -335,90 +342,90 @@ class WheelComponent(Component):
 
 if __name__ == '__main__':
 #
-#    # set up the radar base
-#    in_1 = 3
-#    in_2 = 5
-#    in_3 = 7
-#    in_4 = 11
-#
-#    pins = [in_1, in_2, in_3, in_4 ]
-#
-#    radar_base = DistanceRadarBaseComponent(name='radar_base', pins=pins, step_size=0.71, initial_pos=0, degree=80, pre_rot=40,delay=0.0025)
-#    radar_base.initialize()
-#    radar_base_param = RawDataHandler(name=radar_base.name, parser=radar_base.FORMAT, record_size=2000)
-#
-#    cmd_Q_base    = mp.Queue()
-#    output_Q_base = mp.Queue()
-#
-#    cont_radar_base = ContinuousComponentWrapper(component=radar_base, cmd_Q=cmd_Q_base, output_Q=output_Q_base)
-#
-#
-#    # set up the distance sensor
-#    pin_echo = 18
-#    pin_trig = 16
-#
-#    cmd_Q_sensor = mp.Queue()
-#    output_Q_sensor = mp.Queue()
-#
-#    distance_sensor = DistanceRadarSensorComponent(name='radar_distance_sensor', pin_echo=pin_echo, pin_trig=pin_trig, delay=0.00007)
-#    distance_sensor_param = RawDataHandler(name=distance_sensor.name, parser=distance_sensor.FORMAT, record_size=2000)
-#
-#    cont_distance_sensor = ContinuousComponentWrapper(component=distance_sensor, cmd_Q=cmd_Q_sensor, output_Q=output_Q_sensor)
-#
-#    print("start the processin 3s")
-#    time.sleep(3)
-#
-#    cont_radar_base.start()
-#    cont_distance_sensor.start()
-#
-#    _start =time.time()
-#    while True:
+    # set up the radar base
+    in_1 = 3
+    in_2 = 5
+    in_3 = 7
+    in_4 = 11
+
+    pins = [in_1, in_2, in_3, in_4 ]
+
+    radar_base = DistanceRadarBaseComponent(name='radar_base', pins=pins, step_size=0.71, initial_pos=0, min_degree=-60, max_degree=40, delay=0.0025)
+    radar_base.initialize()
+    radar_base_param = RawDataHandler(name=radar_base.name, parser=radar_base.FORMAT, record_size=2000)
+
+    cmd_Q_base    = mp.Queue()
+    output_Q_base = mp.Queue()
+
+    cont_radar_base = ContinuousComponentWrapper(component=radar_base, cmd_Q=cmd_Q_base, output_Q=output_Q_base)
+
+
+    # set up the distance sensor
+    pin_echo = 18
+    pin_trig = 16
+
+    cmd_Q_sensor = mp.Queue()
+    output_Q_sensor = mp.Queue()
+
+    distance_sensor = DistanceRadarSensorComponent(name='radar_distance_sensor', pin_echo=pin_echo, pin_trig=pin_trig, delay=0.00007)
+    distance_sensor_param = RawDataHandler(name=distance_sensor.name, parser=distance_sensor.FORMAT, record_size=2000)
+
+    cont_distance_sensor = ContinuousComponentWrapper(component=distance_sensor, cmd_Q=cmd_Q_sensor, output_Q=output_Q_sensor)
+
+    print("start the processin 3s")
+    time.sleep(3)
+
+    cont_radar_base.start()
+    cont_distance_sensor.start()
+
+    _start =time.time()
+    while True:
 #        while not output_Q_sensor.empty():
 #            msg = output_Q_sensor.get()
 #            print(msg)
 #            distance_sensor_param.update(msg)
-#
-#        while not output_Q_base.empty():
-#            msg = output_Q_base.get()
-#            print(msg)
-#            radar_base_param.update(msg)
-#
-#        if time.time() - _start > 90:
-#            break
-#    
+
+        while not output_Q_base.empty():
+            msg = output_Q_base.get()
+            print(msg)
+            radar_base_param.update(msg)
+
+        if time.time() - _start > 90:
+            break
+    
 #    distance_sensor_param.data.to_csv('sensor_data.csv')
 #    radar_base_param.data.to_csv('radar_base.csv')
+
+    
+
+#    pin_signal_left = 13
+#    pin_signal_right = 15
 #
-#    
-
-    pin_signal_left = 13
-    pin_signal_right = 15
-
-    left_wheel_component  = WheelComponent(name='left_wheel', mirror=False, pin_signal=pin_signal_left, repeat=20, pulse=None, width=None)
-    right_wheel_component = WheelComponent(name='right_wheel', mirror=True, pin_signal=pin_signal_right, repeat=20, pulse=None, width=None)
-
-    cmd_Q_left_wheel = mp.Queue()
-    output_Q_left_wheel = mp.Queue()
-    cmd_Q_right_wheel = mp.Queue()
-    output_Q_right_wheel = mp.Queue()
-
-
-    left_wheel = ContinuousComponentWrapper(component=left_wheel_component,cmd_Q=cmd_Q_left_wheel,output_Q=output_Q_left_wheel)
-    right_wheel = ContinuousComponentWrapper(component=right_wheel_component,cmd_Q=cmd_Q_right_wheel,output_Q=output_Q_right_wheel)
-
-
-    left_wheel.start()
-    right_wheel.start()
-
-    scale = 0.
-    while True:
-        print('scale: {}'.format(scale))
-        time.sleep(3)
-        cmd_Q_left_wheel.put(('increase_speed',(0.1,), {}))
-        cmd_Q_right_wheel.put(('increase_speed', (0.1,), {}))
-        scale += 0.1
+#    left_wheel_component  = WheelComponent(name='left_wheel', mirror=False, pin_signal=pin_signal_left, repeat=20, pulse=None, width=None)
+#    right_wheel_component = WheelComponent(name='right_wheel', mirror=True, pin_signal=pin_signal_right, repeat=20, pulse=None, width=None)
+#
+#    cmd_Q_left_wheel = mp.Queue()
+#    output_Q_left_wheel = mp.Queue()
+#    cmd_Q_right_wheel = mp.Queue()
+#    output_Q_right_wheel = mp.Queue()
 #
 #
+#    left_wheel = ContinuousComponentWrapper(component=left_wheel_component,cmd_Q=cmd_Q_left_wheel,output_Q=output_Q_left_wheel)
+#    right_wheel = ContinuousComponentWrapper(component=right_wheel_component,cmd_Q=cmd_Q_right_wheel,output_Q=output_Q_right_wheel)
+#
+#
+#    left_wheel.start()
+#    right_wheel.start()
+#
+#    scale = 0.
+#    while True:
+#        print('scale: {}'.format(scale))
+#        time.sleep(3)
+#        cmd_Q_left_wheel.put(('increase_speed',(0.05,), {}))
+#        cmd_Q_right_wheel.put(('increase_speed', (0.05,), {}))
+#        scale += 0.1
+#
+
 
     
 
