@@ -1,4 +1,6 @@
 import pandas as pd 
+import numpy as np
+import time
 class Status:
     def __init__(self,*args, **kwargs):
 
@@ -72,39 +74,21 @@ class RawDataHandler:
     @property
     def data(self):
         df = pd.DataFrame(self._records, columns=self._columns)
-        df['param_name'] = self._name
+        df['DataHandlerName'] = self._name
         return df
 
 
-#class DistanceSensorDataHandler(RawDataHandler):
-#    FORMAT=DistanceRadarSensorComponent.FORMAT
-#    def __init__(self,name=None, record_size=500):
-#        super(DistanceRadarSensorDataHandler, self).__init__(name=name, parser=DistanceSensorDataHandler.FORMAT,record_size=record_size)
-#
-#
-#    @property
-#    def 
 
 
+T_FACTOR = 1000
+CN_DISTANCE = 'distance'
+CN_STATUS = 'status'
+CN_POS = 'pos'
 
 
-
-
-
-#class DistanceRadarSensorDataHandler(RawDataHandler):
-#    PARSER = DistanceRadarSensorComponent.PARSER
-#    pass
-#
-#
-#class DistanceRadarBaseDataHandler(RawDataHandler):
-#    PARSER = DistanceRadarBaseComponent.PARSER
-#    pass
-#
-
-T_FACTOR = 1e4
 
 def format_timestamp(ts,factor=T_FACTOR):
-    return (ts * factor).astype(int)
+    return (ts * factor).astype(np.int64)
 
 def create_distance_map(df_radar_base, df_distance_sensor):
     """
@@ -129,6 +113,9 @@ def create_distance_map(df_radar_base, df_distance_sensor):
 
     df_sensor['timestamp'] = format_timestamp(df_sensor['timestamp'])
     df_base['timestamp']   = format_timestamp(df_base['timestamp'])
+    print('+++++ sensor_min: {}, sensor_max: {}, base_min: {}, base_max: {}'.format(
+            df_sensor['timestamp'].min(), df_sensor['timestamp'].max(),
+            df_base['timestamp'].min(), df_base['timestamp'].max()))
 
     df = pd.merge(df_sensor, df_base, on='timestamp', how='outer', suffixes=('_sensor','_base')).sort_values('timestamp')
     
@@ -140,18 +127,22 @@ def create_distance_map(df_radar_base, df_distance_sensor):
 
     # clean the data
     df['distance'] = df['distance'].fillna(method='ffill')
-    df['status']   = df['distance'].fillna(method='ffill')
+    df['status']   = df['status'].fillna(method='ffill')
 
     df_work = df[(df['pos'].notnull()) & (df['distance'].notnull())]
 
     # select useful information
-    df_work = df_work[['timestamp','status','distance','pos','degree']]
+    df_work = df_work[['pos','timestamp','distance', 'status']]
+
 
 
     # create the distance map
     df_work['pos_bin'] = df_work['pos'].astype(int)
+    df_work = df_work.groupby(by=['pos_bin','timestamp'], as_index=False)['distance'].mean()
+    df_work = df_work.sort_values(['pos_bin','timestamp'])
 
-    ts_distance_map = df_work.gropuby(by='pos_bin')['distance'].mean().sort_index()
+#    ts_distance_map = df_work.groupby(by='pos_bin')['distance'].mean().sort_index()
+    ts_distance_map = df_work.groupby(by='pos_bin')['distance'].agg(lambda x: x.values[-int(x.size / 40):].mean())
 
     return ts_distance_map
 
@@ -178,7 +169,7 @@ class Controller:
         self._radar_distance_sensor = radar_distance_sensor
         self._engine = engine
 
-        self._components = ['radar_base','radar_distance_sensor','engin']
+        self._components = ['radar_base','radar_distance_sensor','engine']
 
         self._comp_output_Q = {}
         self._comp_output_Q['radar_base'] = self._radar_base.output_Q
