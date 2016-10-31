@@ -23,9 +23,9 @@ if __name__ == '__main__':
 
     pins = [in_1, in_2, in_3, in_4 ]
 
-    radar_base = DistanceRadarBaseComponent(name='radar_base', pins=pins, step_size=0.71, initial_pos=0, min_degree=-60, max_degree=40, delay=0.0035)
+    radar_base = DistanceRadarBaseComponent(name='radar_base', pins=pins, step_size=0.71, initial_pos=0, min_degree=-60, max_degree=40, delay=0.0025, delay_factor=5)
     radar_base.initialize()
-    radar_base_datahandler = RawDataHandler(name=radar_base.name, parser=radar_base.FORMAT, record_size=1000)
+    radar_base_datahandler = RawDataHandler(name=radar_base.name, parser=radar_base.FORMAT, record_size=2000)
 
     cmd_Q_base    = mp.Queue()
     output_Q_base = mp.Queue()
@@ -40,7 +40,7 @@ if __name__ == '__main__':
     cmd_Q_sensor = mp.Queue()
     output_Q_sensor = mp.Queue()
 
-    distance_sensor = DistanceRadarSensorComponent(name='radar_distance_sensor', pin_echo=pin_echo, pin_trig=pin_trig, delay=0.00007)
+    distance_sensor = DistanceRadarSensorComponent(name='radar_distance_sensor', pin_echo=pin_echo, pin_trig=pin_trig, delay=0.0007)
     distance_sensor_datahandler = RawDataHandler(name=distance_sensor.name, parser=distance_sensor.FORMAT, record_size=10000)
 
     cont_distance_sensor = ContinuousComponentWrapper(component=distance_sensor, cmd_Q=cmd_Q_sensor, output_Q=output_Q_sensor)
@@ -99,7 +99,10 @@ if __name__ == '__main__':
         df_sensor = distance_sensor_datahandler.data
 
         distance_map = ctl.create_distance_map(df_base, df_sensor)
-        data4hist_distance_map = series2histdata(distance_map)
+        try:
+            data4hist_distance_map = series2histdata(distance_map)
+        except:
+            print(distance_map, distance_map.isnull().sum())
 
 #        print(distance_map.head(20))
 #        time.sleep(1)
@@ -119,6 +122,7 @@ if __name__ == '__main__':
             print('{:2d}:{:0.2f}'.format(idx, distance_map[idx]), " ", end="")
         print()
         print()
+        time.sleep(1.5)
 
 #        print('\n'*10)
             

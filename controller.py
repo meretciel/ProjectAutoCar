@@ -80,7 +80,7 @@ class RawDataHandler:
 
 
 
-T_FACTOR = 1000
+T_FACTOR = 100
 CN_DISTANCE = 'distance'
 CN_STATUS = 'status'
 CN_POS = 'pos'
@@ -128,6 +128,7 @@ def create_distance_map(df_radar_base, df_distance_sensor):
     # clean the data
     df['distance'] = df['distance'].fillna(method='ffill')
     df['status']   = df['status'].fillna(method='ffill')
+    df['pos']      = df['pos'].fillna(method='ffill')
 
     df_work = df[(df['pos'].notnull()) & (df['distance'].notnull())]
 
@@ -142,7 +143,8 @@ def create_distance_map(df_radar_base, df_distance_sensor):
     df_work = df_work.sort_values(['pos_bin','timestamp'])
 
 #    ts_distance_map = df_work.groupby(by='pos_bin')['distance'].mean().sort_index()
-    ts_distance_map = df_work.groupby(by='pos_bin')['distance'].agg(lambda x: x.values[-int(x.size / 40):].mean())
+#    ts_distance_map = df_work.groupby(by='pos_bin')['distance'].agg(lambda x: x.values[-1])
+    ts_distance_map = df_work.groupby(by='pos_bin').apply(lambda x: x.loc[ (x['timestamp'] == x['timestamp'].max()), 'distance'].mean())
 
     return ts_distance_map
 

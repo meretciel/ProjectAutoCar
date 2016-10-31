@@ -153,7 +153,7 @@ class DistanceRadarBaseComponent(Component):
     CLOCKWISE = 0
     ANTI_CLOCKWISE = 1
     FORMAT = ('timestamp', 'comp_name', 'pos', 'min_degree', 'max_degree')
-    def __init__(self, name=None, pins=None, initial_pos=0, min_degree=0, max_degree=180, delay=0.002, step_size=5):
+    def __init__(self, name=None, pins=None, initial_pos=0, min_degree=0, max_degree=180, delay=0.002, delay_factor=3, step_size=5):
         assert name is not None
 
         self._stepper_motor = StepperMotor(pins,initial_pos)
@@ -162,6 +162,7 @@ class DistanceRadarBaseComponent(Component):
         self._min_degree = min_degree
         self._max_degree = max_degree
         self._delay = delay
+        self._delay_factor = delay_factor
         self._step_size = step_size
         
         self._direction = self.ANTI_CLOCKWISE
@@ -186,16 +187,21 @@ class DistanceRadarBaseComponent(Component):
             self._stepper_motor.rotate(degree=self._step_size, clockwise=False, delay=self._delay)
             if self._stepper_motor.pos > self._max_degree :
                 self._direction = self.CLOCKWISE
+                time.sleep(self._delay * self._delay_factor)
 
         else:
             self._stepper_motor.rotate(degree=self._step_size, clockwise=True, delay=self._delay)
             if self._stepper_motor.pos < self._min_degree:
                 self._direction = self.ANTI_CLOCKWISE
+                time.sleep(self._delay * self._delay_factor)
 
 
     def send_msg(self,Q):
         msg = (time.time(), 'DistanceRadarBase::{}'.format(self._name), self._stepper_motor.pos, self.min_degree, self.max_degree)
         Q.put(msg)
+
+    def KeyboardInterruptHandler(self):
+        self._stepper_motor.back_to_zero_pos(delay=self._delay)
 
     
     @property

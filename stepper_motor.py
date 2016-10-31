@@ -65,6 +65,25 @@ class StepperMotor:
                 self._delta_pos -= stepsize
             else:
                 self._delta_pos += stepsize
+
+    def back_to_zero_pos(self, delay=0.002):
+        """
+        The motor will return to the zero position.
+        """
+        if self.pos > 0:
+            self.rotate(degree=self.pos, clockwise=True, delay=delay)
+        else:
+            self.rotate(degree=-self.pos, clockwise=False, delay=delay)
+
+    def back_to_init_pos(self, delay=0.002):
+        """
+        The motor will return to the initial position.
+        """
+        if self.delta_pos > 0:
+            self.rotate(degree=self.delta_pos, clockwise=True, delay=delay)
+        else:
+            self.rotate(degree=-self.data_pos, clockwise=False, delay=delay)
+
             
     def turn_off_all_pins(self):
         for pin in self._pins:
@@ -121,6 +140,9 @@ class StepperMotor:
     def pos(self):
         return self._init_pos + self.delta_pos
 
+    @property
+    def init_pos(self):
+        return self._init_pos
 
 if __name__ == '__main__':
 
