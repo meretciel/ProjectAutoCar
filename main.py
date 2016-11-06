@@ -1,5 +1,8 @@
 import time
 import multiprocessing as mp
+import psutil
+import os
+import signal
 
 
 from components import (DistanceRadarBaseComponent, DistanceRadarSensorComponent, WheelComponent, ContinuousComponentWrapper)
@@ -82,6 +85,7 @@ if __name__ == '__main__':
             
 
     while True:
+        _start = time.time()
 
         while not output_Q_sensor.empty():
             msg = output_Q_sensor.get()
@@ -103,12 +107,13 @@ if __name__ == '__main__':
             print("[failed] Cannot create distance map")
 
         try:
-            plot_hist(data4hist_distance_map, pch='#',bincount=100)
+            pass
+#            plot_hist(data4hist_distance_map, pch='#',bincount=100)
         except Exception:
             pass
             print("[failed] Cannot plot distance map")
-        time.sleep(1.5)
 
+        print("time elapses: {}".format(time.time() - _start))
 
         # handle the input from the keyboard
 
@@ -118,18 +123,34 @@ if __name__ == '__main__':
 
         # this functionality is provided by the xutils.key_press_handler
 
-        key_press = xutils.key_press_handler()
+        while True:
+            key_press = xutils.key_press_handler()
 
 
-        if key_press == 'q':
-            print("Exiting system")
-            xutils.kill_current_process()
+            if key_press == 'q':
+                print("Exiting system")
+                pid = os.getpid()
+                parent = psutil.Process(pid)
+                children = parent.children(recursive=True)
+                for process in children:
+                    os.kill(process.pid, signal.SIGINT)
 
-        elif key_press == xutils.UP_ARR:
-            engine.increase_speed(0.005) 
-        elif key_press == xutils.DOWN_ARR:
-            engine.increase_speed(-0.005)
-        elif key_press == xutils.LEFT_ARR:
-            engine.turn_left(0.5,0.5)
-        elif key_press == xutils.RIGHT_ARR:
-            engine.turn_right(0.5,0.5)
+                os.kill(pid, signal.SIGINT)
+
+
+
+            elif key_press is None:
+                break
+
+            elif key_press == xutils.UP_ARR:
+                print(xutils.UP_ARR)
+                engine.increase_speed(0.005) 
+            elif key_press == xutils.DOWN_ARR:
+                print(xutils.DOWN_ARR)
+                engine.increase_speed(-0.005)
+            elif key_press == xutils.LEFT_ARR:
+                print(xutils.LEFT_ARR)
+                engine.turn_left(0.5,0.5)
+            elif key_press == xutils.RIGHT_ARR:
+                print(xutils.RIGHT_ARR)
+                engine.turn_right(0.5,0.5)

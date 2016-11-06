@@ -4,6 +4,7 @@ import termios
 import sys
 import signal
 import os
+import copy
 
 UP_ARR    = "__up_arrow__"
 DOWN_ARR  = "__down_arrow__"
@@ -13,8 +14,21 @@ RIGHT_ARR = "__right_arrow__"
 def getchar():
     fd = sys.stdin.fileno()
     old_setting = termios.tcgetattr(fd)
+
     try:
+        # switch to noncanonical mode
         tty.setraw(sys.stdin.fileno())
+        new_setting = termios.tcgetattr(fd)
+
+        # set the timeout
+        cc = new_setting[6]
+        cc[termios.VTIME] = 3 # timeout = 0.3s
+        cc[termios.VMIN]  = 0 # start the timer immediately
+
+        # update termios struct
+        termios.tcsetattr(fd, termios.TCSADRAIN, new_setting)
+
+        # read
         ch = sys.stdin.read(1)
     finally:
         termios.tcsetattr(fd, termios.TCSADRAIN, old_setting)
@@ -25,6 +39,9 @@ def getchar():
 
 def arrow_key_handler():
     ch1 = getchar()
+    if ch1 is None or len(ch1) == 0:
+        return 
+
     ch2 = getchar()
     ch3 = getchar()
 
@@ -44,6 +61,9 @@ def arrow_key_handler():
 
 def key_press_handler():
     ch = getchar()
+
+    if ch is None or len(ch) == 0:
+        return
 
     if ord(ch) == 27:
         ch2 = getchar()
@@ -72,7 +92,7 @@ def _INT_handler(signal, frame):
     raise KeyboardInterrupt
 
 def kill_current_process():
-    os.kill(os.getpid, signal.SIGINT.value)
+    os.kill(os.getpid(), signal.SIGINT.value)
 
 
 if __name__ == '__main__':

@@ -113,9 +113,9 @@ def create_distance_map(df_radar_base, df_distance_sensor):
 
     df_sensor['timestamp'] = format_timestamp(df_sensor['timestamp'])
     df_base['timestamp']   = format_timestamp(df_base['timestamp'])
-    print('+++++ sensor_min: {}, sensor_max: {}, base_min: {}, base_max: {}'.format(
-            df_sensor['timestamp'].min(), df_sensor['timestamp'].max(),
-            df_base['timestamp'].min(), df_base['timestamp'].max()))
+#    print('+++++ sensor_min: {}, sensor_max: {}, base_min: {}, base_max: {}'.format(
+#            df_sensor['timestamp'].min(), df_sensor['timestamp'].max(),
+#            df_base['timestamp'].min(), df_base['timestamp'].max()))
 
     df = pd.merge(df_sensor, df_base, on='timestamp', how='outer', suffixes=('_sensor','_base')).sort_values('timestamp')
     
