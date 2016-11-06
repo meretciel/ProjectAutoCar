@@ -1,8 +1,3 @@
-
-
-
-
-
 import time
 import multiprocessing as mp
 
@@ -11,11 +6,12 @@ from components import (DistanceRadarBaseComponent, DistanceRadarSensorComponent
 from engine import Engine
 from controller import RawDataHandler
 
+import xutils
 
 if __name__ == '__main__':
     
     
-    # set up the radar base
+    # set up radar base
     in_1 = 3
     in_2 = 5
     in_3 = 7
@@ -33,7 +29,7 @@ if __name__ == '__main__':
     cont_radar_base = ContinuousComponentWrapper(component=radar_base, cmd_Q=cmd_Q_base, output_Q=output_Q_base)
 
 
-    # set up the distance sensor
+    # set up distance sensor
     pin_echo = 18
     pin_trig = 16
 
@@ -45,6 +41,7 @@ if __name__ == '__main__':
 
     cont_distance_sensor = ContinuousComponentWrapper(component=distance_sensor, cmd_Q=cmd_Q_sensor, output_Q=output_Q_sensor)
     
+    # set up wheels
     
     pin_signal_left = 13
     pin_signal_right = 15
@@ -59,8 +56,8 @@ if __name__ == '__main__':
     # start all the components
     cont_radar_base.start()
     cont_distance_sensor.start()
+    engine.start()
 
-#    engine.start()
 
     # control ??
     import controller as ctl
@@ -102,34 +99,37 @@ if __name__ == '__main__':
         try:
             data4hist_distance_map = series2histdata(distance_map)
         except:
-            print(distance_map, distance_map.isnull().sum())
+            #print(distance_map, distance_map.isnull().sum())
+            print("[failed] Cannot create distance map")
 
-#        print(distance_map.head(20))
-#        time.sleep(1)
-#        print(distance_map.iloc[20:40])
-#        time.sleep(1)
-#        print(distance_map.iloc[40:60])
-#        time.sleep(1)
-#        print(distance_map.iloc[60:80])
-#        time.sleep(1)
-#        print(distance_map.iloc[80:99])
-#        time.sleep(1)
         try:
             plot_hist(data4hist_distance_map, pch='#',bincount=100)
         except Exception:
             pass
-        for idx in distance_map.index:
-            print('{:2d}:{:0.2f}'.format(idx, distance_map[idx]), " ", end="")
-        print()
-        print()
+            print("[failed] Cannot plot distance map")
         time.sleep(1.5)
 
-#        print('\n'*10)
-            
-#        engine.stop() 
-#        time.sleep(5)
-#        print('engine increases speed')
-#        engine.increase_speed(0.2)
-        
+
+        # handle the input from the keyboard
+
+        # When we read the key press, we will temporarily switch to the non-canonical mode
+        # so that we can read the input from the keyboard char by char instead of waiting
+        # for the new line character
+
+        # this functionality is provided by the xutils.key_press_handler
+
+        key_press = xutils.key_press_handler()
 
 
+        if key_press == 'q':
+            print("Exiting system")
+            xutils.kill_current_process()
+
+        elif key_press == xutils.UP_ARR:
+            engine.increase_speed(0.005) 
+        elif key_press == xutils.DOWN_ARR:
+            engine.increase_speed(-0.005)
+        elif key_press == xutils.LEFT_ARR:
+            engine.turn_left(0.5,0.5)
+        elif key_press == xutils.RIGHT_ARR:
+            engine.turn_right(0.5,0.5)
