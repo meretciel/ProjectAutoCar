@@ -267,7 +267,7 @@ class WheelComponent(Component):
     """
     FORMAT = ('timestamp', 'comp_name', 'pulse', 'repeat')
 
-    def __init__(self, name=None, mirror=False, pin_signal=None, repeat=10, pulse=None, width=None):
+    def __init__(self, name=None, mirror=False, pin_signal=None, repeat=10, pulse=None, width=None, power=1):
         """
         Args:
             name:           the name of the component.
@@ -287,13 +287,15 @@ class WheelComponent(Component):
 
         assert name is not None
         assert pin_signal is not None
+        assert 0 < power <= 1
+
         self._name = name
         self._pin_signal = pin_signal
         self._motor = WheelMotor(pin_signal=self._pin_signal)
         self._reference_pulse = self._motor.reference_pulse
         self._max_deviation = self._motor.max_pulse_deviation
-        self._max_pulse = self._reference_pulse + self._max_deviation
-        self._min_pulse = self._reference_pulse - self._max_deviation
+        self._max_pulse = self._reference_pulse + self._max_deviation * power
+        self._min_pulse = self._reference_pulse - self._max_deviation * power
 
         self._pulse = pulse if pulse is not None else self._reference_pulse
         self._width = width if width is not None else self._motor.width

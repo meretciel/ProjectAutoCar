@@ -11,7 +11,7 @@ DOWN_ARR  = "__down_arrow__"
 LEFT_ARR  = "__left_arrow__" 
 RIGHT_ARR = "__right_arrow__"
 
-def getchar():
+def getchar(timeout=3):
     fd = sys.stdin.fileno()
     old_setting = termios.tcgetattr(fd)
 
@@ -22,7 +22,7 @@ def getchar():
 
         # set the timeout
         cc = new_setting[6]
-        cc[termios.VTIME] = 3 # timeout = 0.3s
+        cc[termios.VTIME] = timeout # timeout = 0.3s
         cc[termios.VMIN]  = 0 # start the timer immediately
 
         # update termios struct
@@ -59,16 +59,16 @@ def arrow_key_handler():
             return None
         
 
-def key_press_handler():
-    ch = getchar()
+def key_press_handler(timeout=3):
+    ch = getchar(timeout=timeout)
 
     if ch is None or len(ch) == 0:
         return
 
     if ord(ch) == 27:
-        ch2 = getchar()
+        ch2 = getchar(timeout=timeout)
         if ord(ch2) ==  91:
-            ch3 = getchar()
+            ch3 = getchar(timeout=timeout)
             val = ord(ch3)
             if val == 65:
                 return UP_ARR

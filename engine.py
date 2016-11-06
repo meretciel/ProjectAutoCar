@@ -69,33 +69,36 @@ class Engine:
         self._cmd_Q_left.put(('stop', (), {}))
         self._cmd_Q_right.put(('stop', (), {}))
 
-    def turn_left(self, scale=0.5, period=1.):
+    def turn_left(self, scale=0.5, weight=0.2, period=0.3):
         """
         Turn left. The if scale = 0, the turn is slow; if the scale = 1., the turn is sharp.
         """
-        scale = min(scale, 1)
-        scale = max(scale, 0)
-        left_scale = -(1 - scale)
-        right_scale = scale
+
+        zero_left  = 0.
+        zero_right = 0.1
+        one_left   = -1
+        one_right  = 1
+
+        left_scale = scale * (one_left * weight + zero_left * (1 - weight))
+        right_scale = scale * (one_right * weight + zero_right * (1 - weight)) 
+
+
         self._change_speed(left_scale, right_scale)
-        time.sleep(period)
-        self.stop()
-        self.increase_speed(self._startup_scale)
 
 
-    def turn_right(self, scale=0.5, period=1.):
+    def turn_right(self, scale=0.5, weight=0.2, period=0.3):
         """
         Turn right. The if scale = 0, the turn is slow; if the scale = 1., the turn is sharp.
         """
-        scale = min(scale, 1)
-        scale = max(scale, 0)
-
-        left_scale = scale
-        right_scale = -(1 - scale)
+        zero_left  = 0.1
+        zero_right = 0
+        one_left   = 1
+        one_right  = -1
+        
+        left_scale = scale * (one_left * weight + zero_left * (1 - weight))
+        right_scale = scale * (one_right * weight + zero_right * (1 - weight)) 
 
         self._change_speed(left_scale, right_scale)
-        self.stop()
-        self.increase_speed(self._startup_scale)
                 
 
 

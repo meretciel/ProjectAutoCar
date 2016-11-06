@@ -24,7 +24,7 @@ if __name__ == '__main__':
 
     radar_base = DistanceRadarBaseComponent(name='radar_base', pins=pins, step_size=0.71, initial_pos=0, min_degree=-60, max_degree=40, delay=0.0025, delay_factor=5)
     radar_base.initialize()
-    radar_base_datahandler = RawDataHandler(name=radar_base.name, parser=radar_base.FORMAT, record_size=2000)
+    radar_base_datahandler = RawDataHandler(name=radar_base.name, parser=radar_base.FORMAT, record_size=1000)
 
     cmd_Q_base    = mp.Queue()
     output_Q_base = mp.Queue()
@@ -40,7 +40,7 @@ if __name__ == '__main__':
     output_Q_sensor = mp.Queue()
 
     distance_sensor = DistanceRadarSensorComponent(name='radar_distance_sensor', pin_echo=pin_echo, pin_trig=pin_trig, delay=0.0007)
-    distance_sensor_datahandler = RawDataHandler(name=distance_sensor.name, parser=distance_sensor.FORMAT, record_size=10000)
+    distance_sensor_datahandler = RawDataHandler(name=distance_sensor.name, parser=distance_sensor.FORMAT, record_size=2000)
 
     cont_distance_sensor = ContinuousComponentWrapper(component=distance_sensor, cmd_Q=cmd_Q_sensor, output_Q=output_Q_sensor)
     
@@ -49,8 +49,8 @@ if __name__ == '__main__':
     pin_signal_left = 13
     pin_signal_right = 15
 
-    left_wheel_component  = WheelComponent(name='left_wheel',  mirror=False, pin_signal=pin_signal_left,  repeat=30, pulse=None, width=None)
-    right_wheel_component = WheelComponent(name='right_wheel', mirror=True,  pin_signal=pin_signal_right, repeat=30, pulse=None, width=None)
+    left_wheel_component  = WheelComponent(name='left_wheel',  mirror=False, pin_signal=pin_signal_left,  repeat=10, pulse=None, width=None, power=0.4)
+    right_wheel_component = WheelComponent(name='right_wheel', mirror=True,  pin_signal=pin_signal_right, repeat=10, pulse=None, width=None, power=0.4)
 
     engine = Engine(left_wheel_comp=left_wheel_component, right_wheel_comp=right_wheel_component)
 
@@ -124,7 +124,10 @@ if __name__ == '__main__':
         # this functionality is provided by the xutils.key_press_handler
 
         while True:
-            key_press = xutils.key_press_handler()
+            __start = time.time()
+            key_press = xutils.key_press_handler(timeout=25)
+
+            print("key_press waiting time: {}".format(time.time() - __start))
 
 
             if key_press == 'q':
@@ -150,7 +153,13 @@ if __name__ == '__main__':
                 engine.increase_speed(-0.005)
             elif key_press == xutils.LEFT_ARR:
                 print(xutils.LEFT_ARR)
-                engine.turn_left(0.5,0.5)
+                engine.turn_left(scale=0.01, weight=0.2, period=0.3)
             elif key_press == xutils.RIGHT_ARR:
                 print(xutils.RIGHT_ARR)
-                engine.turn_right(0.5,0.5)
+                engine.turn_right(scale=0.01, weight=0.2, period=0.3)
+        
+        engine.stop()
+
+
+
+
