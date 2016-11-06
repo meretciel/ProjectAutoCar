@@ -49,8 +49,8 @@ if __name__ == '__main__':
     pin_signal_left = 13
     pin_signal_right = 15
 
-    left_wheel_component  = WheelComponent(name='left_wheel',  mirror=False, pin_signal=pin_signal_left,  repeat=10, pulse=None, width=None, power=0.4)
-    right_wheel_component = WheelComponent(name='right_wheel', mirror=True,  pin_signal=pin_signal_right, repeat=10, pulse=None, width=None, power=0.4)
+    left_wheel_component  = WheelComponent(name='left_wheel',  mirror=False, pin_signal=pin_signal_left,  repeat=10, pulse=None, reference_pulse=0.001462, max_pulse_deviation=0.00030, width=None, power=0.6)
+    right_wheel_component = WheelComponent(name='right_wheel', mirror=True,  pin_signal=pin_signal_right, repeat=10, pulse=None, reference_pulse=0.001450, max_pulse_deviation=0.00025, width=None, power=0.6)
 
     engine = Engine(left_wheel_comp=left_wheel_component, right_wheel_comp=right_wheel_component)
 
@@ -99,8 +99,8 @@ if __name__ == '__main__':
         df_base = radar_base_datahandler.data
         df_sensor = distance_sensor_datahandler.data
 
-        distance_map = ctl.create_distance_map(df_base, df_sensor)
         try:
+            distance_map = ctl.create_distance_map(df_base, df_sensor)
             data4hist_distance_map = series2histdata(distance_map)
         except:
             #print(distance_map, distance_map.isnull().sum())
@@ -125,9 +125,9 @@ if __name__ == '__main__':
 
         while True:
             __start = time.time()
-            key_press = xutils.key_press_handler(timeout=25)
+            key_press = xutils.key_press_handler(timeout=10)
 
-            print("key_press waiting time: {}".format(time.time() - __start))
+#            print("key_press waiting time: {}".format(time.time() - __start))
 
 
             if key_press == 'q':
@@ -147,16 +147,16 @@ if __name__ == '__main__':
 
             elif key_press == xutils.UP_ARR:
                 print(xutils.UP_ARR)
-                engine.increase_speed(0.005) 
+                engine.increase_speed(0.015) 
             elif key_press == xutils.DOWN_ARR:
                 print(xutils.DOWN_ARR)
-                engine.increase_speed(-0.005)
+                engine.increase_speed(-0.015)
             elif key_press == xutils.LEFT_ARR:
                 print(xutils.LEFT_ARR)
-                engine.turn_left(scale=0.05, weight=0.3, period=0.4)
+                engine.turn_left(scale=0.1, weight=0.6, period=0.4)
             elif key_press == xutils.RIGHT_ARR:
                 print(xutils.RIGHT_ARR)
-                engine.turn_right(scale=0.05, weight=0.3, period=0.4)
+                engine.turn_right(scale=0.1, weight=0.6, period=0.4)
         
         engine.stop()
 

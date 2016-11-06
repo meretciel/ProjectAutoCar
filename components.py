@@ -267,7 +267,7 @@ class WheelComponent(Component):
     """
     FORMAT = ('timestamp', 'comp_name', 'pulse', 'repeat')
 
-    def __init__(self, name=None, mirror=False, pin_signal=None, repeat=10, pulse=None, width=None, power=1):
+    def __init__(self, name=None, mirror=False, pin_signal=None, repeat=10, pulse=None, reference_pulse=None, max_pulse_deviation=None,width=None, power=1):
         """
         Args:
             name:           the name of the component.
@@ -291,7 +291,9 @@ class WheelComponent(Component):
 
         self._name = name
         self._pin_signal = pin_signal
-        self._motor = WheelMotor(pin_signal=self._pin_signal)
+
+        self._motor = WheelMotor(pin_signal=self._pin_signal, reference_pulse=reference_pulse, max_pulse_deviation=max_pulse_deviation)
+
         self._reference_pulse = self._motor.reference_pulse
         self._max_deviation = self._motor.max_pulse_deviation
         self._max_pulse = self._reference_pulse + self._max_deviation * power
@@ -343,6 +345,7 @@ class WheelComponent(Component):
 #        scale = min(scale, 1.)
 #        scale = max(scale, -1.)
 
+#        print("\n{}::increase_speed::scale={}::current_pulse={}\n".format(self._name, scale, self.pulse))
         increment = scale *  self._max_deviation
 
         if self._mirror:

@@ -1,5 +1,6 @@
 import time
 import multiprocessing as mp
+import random
 
 from components import WheelComponent, ContinuousComponentWrapper
 
@@ -55,8 +56,14 @@ class Engine:
         """
         change the speed of the two wheels. A utility function.
         """
-        self._cmd_Q_left.put(('increase_speed',  (left_scale,), {}))
-        self._cmd_Q_right.put(('increase_speed', (right_scale,), {}))
+        rdn_num = random.random()
+        if rdn_num <= 0.5:
+            self._cmd_Q_left.put(('increase_speed',  (left_scale,), {}))
+            self._cmd_Q_right.put(('increase_speed', (right_scale,), {}))
+        else:
+            self._cmd_Q_right.put(('increase_speed', (right_scale,), {}))
+            self._cmd_Q_left.put(('increase_speed',  (left_scale,), {}))
+
 
     def increase_speed(self, scale):
         self._change_speed(left_scale=scale, right_scale=scale)
@@ -75,11 +82,11 @@ class Engine:
         """
 
         zero_left  = 0.
-        zero_right = 0.1
-        one_left   = -1
-        one_right  = 1
+        zero_right = 0.
+        one_left   = 0.35
+        one_right  = 1.
 
-        left_scale = scale * (one_left * weight + zero_left * (1 - weight))
+        left_scale  = scale * (one_left  * weight + zero_left  * (1 - weight))
         right_scale = scale * (one_right * weight + zero_right * (1 - weight)) 
 
 
@@ -90,12 +97,12 @@ class Engine:
         """
         Turn right. The if scale = 0, the turn is slow; if the scale = 1., the turn is sharp.
         """
-        zero_left  = 0.1
-        zero_right = 0
-        one_left   = 1
-        one_right  = -1
+        zero_left  = 0.
+        zero_right = 0.
+        one_left   = 1.
+        one_right  = 0.35
         
-        left_scale = scale * (one_left * weight + zero_left * (1 - weight))
+        left_scale  = scale * (one_left  * weight + zero_left  * (1 - weight))
         right_scale = scale * (one_right * weight + zero_right * (1 - weight)) 
 
         self._change_speed(left_scale, right_scale)
