@@ -153,10 +153,10 @@ if __name__ == '__main__':
                 engine.increase_speed(-0.005)
             elif key_press == xutils.LEFT_ARR:
                 print(xutils.LEFT_ARR)
-                engine.turn_left(scale=0.01, weight=0.2, period=0.3)
+                engine.turn_left(scale=0.05, weight=0.3, period=0.4)
             elif key_press == xutils.RIGHT_ARR:
                 print(xutils.RIGHT_ARR)
-                engine.turn_right(scale=0.01, weight=0.2, period=0.3)
+                engine.turn_right(scale=0.05, weight=0.3, period=0.4)
         
         engine.stop()
 
