@@ -328,6 +328,21 @@ class WheelComponent(Component):
     @repeat.setter
     def repeat(self,val):
         self._repeat = min(val, 50)
+    
+    @property
+    def max_pulse_deviation(self):
+        return self._max_deviation
+
+    @property
+    def mirror(self):
+        return self._mirror
+
+    def set_speed(self, scale):
+        increment = scale * self._max_deviation
+        if self._mirror:
+            increment = -1 * increment
+        self._pulse = self._reference_pulse + increment
+
 
     def increase_speed(self, scale, block=False):
         """

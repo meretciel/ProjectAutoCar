@@ -49,8 +49,8 @@ if __name__ == '__main__':
     pin_signal_left = 13
     pin_signal_right = 15
 
-    left_wheel_component  = WheelComponent(name='left_wheel',  mirror=False, pin_signal=pin_signal_left,  repeat=10, pulse=None, reference_pulse=0.001462, max_pulse_deviation=0.00030, width=None, power=0.6)
-    right_wheel_component = WheelComponent(name='right_wheel', mirror=True,  pin_signal=pin_signal_right, repeat=10, pulse=None, reference_pulse=0.001450, max_pulse_deviation=0.00025, width=None, power=0.6)
+    left_wheel_component  = WheelComponent(name='left_wheel',  mirror=False, pin_signal=pin_signal_left,  repeat=10, pulse=None, reference_pulse=0.001462, max_pulse_deviation=0.00025, width=None, power=1.)
+    right_wheel_component = WheelComponent(name='right_wheel', mirror=True,  pin_signal=pin_signal_right, repeat=10, pulse=None, reference_pulse=0.001450, max_pulse_deviation=0.00025, width=None, power=1.)
 
     engine = Engine(left_wheel_comp=left_wheel_component, right_wheel_comp=right_wheel_component)
 
@@ -140,25 +140,30 @@ if __name__ == '__main__':
 
                 os.kill(pid, signal.SIGINT)
 
+            elif key_press == 'b':
+                print("break!")
+                engine.stop()
 
+            elif key_press == 's':
+                print('go straight!')
+                engine.go_straight()
 
             elif key_press is None:
                 break
 
             elif key_press == xutils.UP_ARR:
                 print(xutils.UP_ARR)
-                engine.increase_speed(0.015) 
+                engine.increase_speed(0.035) 
             elif key_press == xutils.DOWN_ARR:
                 print(xutils.DOWN_ARR)
-                engine.increase_speed(-0.015)
+                engine.increase_speed(-0.025)
             elif key_press == xutils.LEFT_ARR:
                 print(xutils.LEFT_ARR)
-                engine.turn_left(scale=0.1, weight=0.6, period=0.4)
+                engine.turn_left(scale=0.15, weight=0.3, period=1.)
             elif key_press == xutils.RIGHT_ARR:
                 print(xutils.RIGHT_ARR)
-                engine.turn_right(scale=0.1, weight=0.6, period=0.4)
+                engine.turn_right(scale=0.15, weight=0.3, period=1.)
         
-        engine.stop()
 
 
 
